@@ -1,0 +1,31 @@
+{
+  "name": "near-guard",
+  "version": "0.1.0",
+  "description": "Guard: a policy firewall for AI-agent and community wallets on NEAR",
+  "license": "MIT",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build:contracts": "cd contracts/guard && cargo near build non-reproducible-wasm && cd ../test-token && cargo near build non-reproducible-wasm",
+    "test": "vitest run",
+    "test:contracts": "cd contracts && cargo test",
+    "typecheck": "tsc --noEmit",
+    "check": "tsx scripts/check.ts",
+    "testnet:setup": "tsx scripts/testnet-setup.ts",
+    "demo": "tsx scripts/demo.ts",
+    "demo:sandbox": "tsx scripts/demo.ts --sandbox"
+  },
+  "dependencies": {
+    "@defuse-protocol/one-click-sdk-typescript": "^0.1.26",
+    "near-api-js": "^7.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3",
+    "vitest": "^5.0.5"
+  }
+}
