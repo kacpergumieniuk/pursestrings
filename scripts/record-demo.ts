@@ -1,6 +1,6 @@
 /**
  * npm run demo:record   Records `npm run demo:video` into docs/video/:
- *   guard-demo.cast   asciicast v2 (play with `asciinema play`, or convert with `agg` to a GIF)
+ *   pursestrings-demo.cast   asciicast v2 (play with `asciinema play`, or convert with `agg` to a GIF)
  *   transcript.txt    the same run as plain text (for subtitles and review)
  *   viewer.html       self-contained player: terminal on the left, the Telegram chat on a phone on the
  *                     right, scene captions on top. Open it, press Space, screen-record at 1920x1080.
@@ -15,7 +15,7 @@ import { join } from "node:path";
 import { ROOT } from "../src/demo/setup";
 
 const OUT = join(ROOT, "docs/video");
-const CAST = join(OUT, "guard-demo.cast");
+const CAST = join(OUT, "pursestrings-demo.cast");
 const WIDTH = 100;
 const HEIGHT = 44;
 /** Longest pause kept in the recording (node start-up and sandbox boot are compressed). */
@@ -50,7 +50,7 @@ if (!argv.includes("--viewer-only")) {
   const code: number = await new Promise((r) => child.on("close", (c) => r(c ?? 1)));
   process.stdout.write("\n");
   if (code !== 0) throw new Error(`demo:video exited with ${code}`);
-  const header = { version: 2, width: WIDTH, height: HEIGHT, title: "Guard: policy firewall for AI-agent wallets on NEAR (NEAR HACKATHON 2026)", env: { TERM: "xterm-256color", SHELL: "/bin/zsh" } };
+  const header = { version: 2, width: WIDTH, height: HEIGHT, title: "PurseStrings: policy firewall for AI-agent wallets on NEAR (NEAR HACKATHON 2026)", env: { TERM: "xterm-256color", SHELL: "/bin/zsh" } };
   writeFileSync(CAST, [JSON.stringify(header), ...events.map(([t, d]) => JSON.stringify([t, "o", d]))].join("\n") + "\n");
   const plain = events
     .map(([, d]) => d)

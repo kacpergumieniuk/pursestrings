@@ -1,5 +1,5 @@
 /**
- * Guard's Telegram bot.
+ * PurseStrings' Telegram bot.
  *
  *   npm run bot                     Telegram mode. Needs TELEGRAM_BOT_TOKEN; owners in TELEGRAM_OWNER_IDS
  *                                   (comma-separated Telegram user ids; send /whoami to the bot to get yours).
@@ -36,7 +36,7 @@ import { offlineData } from "../src/telegram/offline";
 const args = new Set(process.argv.slice(2));
 const consoleMode = args.has("--console");
 const offline = args.has("--offline");
-const log = (m: string) => console.error(`[guard-bot] ${m}`);
+const log = (m: string) => console.error(`[pursestrings-bot] ${m}`);
 
 const state = offline ? undefined : loadState("testnet");
 const owner: OwnerControl | undefined = offline ? simulatedVault() : loadTestnetOwnerControl();
@@ -46,7 +46,7 @@ async function makeChecker(): Promise<Checker> {
   if (state) {
     try {
       const denied = await new GuardViews(state.vault.id, state.rpcUrl, "testnet").listDenied("recipient");
-      scamList.add(denied.map((d) => ({ type: "account" as const, value: d.account_id, reason: d.entry.reason, source: `guard:${state.vault.id}` })));
+      scamList.add(denied.map((d) => ({ type: "account" as const, value: d.account_id, reason: d.entry.reason, source: `denylist:${state.vault.id}` })));
     } catch (e) {
       log(`could not read the vault denylist: ${(e as Error).message}`);
     }
@@ -107,10 +107,10 @@ if (consoleMode) {
   const OWNER = 1001;
   const GROUP = -2002;
   const chat = new ConsoleChat({ chatNames: { [OWNER]: "you (owner, private chat)", [GROUP]: "NEAR builders (group)" } });
-  const bot = new GuardBot({ chat: chat as ChatApi, checker, owner, ownerUserIds: [OWNER], botUsername: "GuardBot", log });
+  const bot = new GuardBot({ chat: chat as ChatApi, checker, owner, ownerUserIds: [OWNER], botUsername: "PurseStringsBot", log });
   const watcher = makeWatcher(bot);
   console.log(
-    `Guard bot, console mode. Vault: ${owner ? `${owner.vaultId} (${owner.network}${offline ? ", simulated" : ""})` : "none (run npm run testnet:setup)"}.` +
+    `PurseStrings bot, console mode. Vault: ${owner ? `${owner.vaultId} (${owner.network}${offline ? ", simulated" : ""})` : "none (run npm run testnet:setup)"}.` +
       `\nType /help, /check <account|token|link>, /pending, /status. ":group <text>" speaks in a group, ":tap <n>" presses a button, ":quit" exits.\n`,
   );
   await watcher.tick();

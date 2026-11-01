@@ -23,7 +23,7 @@ function fakeChain() {
 }
 
 describe("blockedEventsFromLogs", () => {
-  it("parses Guard's transfer_blocked events and ignores everything else", () => {
+  it("parses PurseStrings' transfer_blocked events and ignores everything else", () => {
     const ev = blockedEventsFromLogs([BLOCKED_LOG, "plain log", 'EVENT_JSON:{"standard":"nep141","event":"ft_transfer","data":[]}', "EVENT_JSON:{broken"]);
     expect(ev).toHaveLength(1);
     expect(ev[0]).toMatchObject({ code: "RECIPIENT_DENYLISTED", receiver_id: "claim.drainer-mvxpkwqz.testnet" });

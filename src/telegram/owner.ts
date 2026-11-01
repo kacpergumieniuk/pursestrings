@@ -60,7 +60,7 @@ export interface OwnerControl {
 
 export class MainnetRefusedError extends Error {
   constructor() {
-    super("Guard's bot signs owner actions on testnet or a local sandbox only; mainnet is refused.");
+    super("The PurseStrings bot signs owner actions on testnet or a local sandbox only; mainnet is refused.");
   }
 }
 

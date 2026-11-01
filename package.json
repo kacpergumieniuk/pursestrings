@@ -1,7 +1,7 @@
 {
-  "name": "near-guard",
+  "name": "pursestrings",
   "version": "0.1.0",
-  "description": "Guard: a policy firewall for AI-agent and community wallets on NEAR",
+  "description": "PurseStrings: a policy firewall for AI-agent wallets on NEAR. Your agent carries the purse; you hold the strings.",
   "license": "MIT",
   "private": true,
   "type": "module",

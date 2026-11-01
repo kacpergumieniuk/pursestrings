@@ -1,5 +1,5 @@
 /**
- * The minimal chat surface Guard's bot needs. Telegram (grammY), the terminal console and the
+ * The minimal chat surface the PurseStrings bot needs. Telegram (grammY), the terminal console and the
  * unit tests each implement `ChatApi`, so every handler runs the same way with or without a token.
  * Messages are plain text (no parse mode), so user input can never inject markup.
  */

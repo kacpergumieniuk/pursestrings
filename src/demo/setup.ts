@@ -1,9 +1,9 @@
 /**
- * Creates a complete Guard demo environment on testnet (free faucet accounts) or on a
+ * Creates a complete PurseStrings demo environment on testnet (free faucet accounts) or on a
  * local sandbox node:
  *
  *   owner   - the human who controls the policy (the only faucet/genesis-created account)
- *   vault.<owner>  - holds the funds; the Guard contract is deployed here
+ *   vault.<owner>  - holds the funds; the PurseStrings contract is deployed here
  *   payee.<owner>  - a normal contractor the agent pays
  *   vendor.<owner> - a vendor whose invoice is above the agent per-transaction cap
  *   usdc-airdrop.<owner> - a fake "USDC" token airdropped into the vault (the scam)
@@ -139,7 +139,7 @@ export async function setupDemo(opts: {
   const tokenWasm = readWasm(WASM.token);
 
   log(`creating the root dev account (tag ${tag})`);
-  const owner = await opts.factory.create(`guard-owner-${tag}`, "20");
+  const owner = await opts.factory.create(`purse-owner-${tag}`, "20");
   const ownerAcc = new Account(owner.id, provider, owner.key);
   const sub = async (prefix: string, near: `${number}`): Promise<KeyedAccount> => {
     const kp = KeyPair.fromRandom("ed25519");
@@ -151,7 +151,7 @@ export async function setupDemo(opts: {
   const vendor = await sub("vendor", "0.1");
   log(`owner ${owner.id}; vault ${vault.id}; payee ${payee.id}; vendor ${vendor.id}`);
 
-  log("deploying the Guard contract to the vault");
+  log("deploying the PurseStrings contract to the vault");
   const vaultAcc = new Account(vault.id, provider, vault.key);
   await vaultAcc.signAndSendTransaction({
     receiverId: vault.id,
@@ -203,7 +203,7 @@ export async function setupDemo(opts: {
 
   const drainerParent = `drainer-${tag}.${opts.factory.suffix}`;
   log(`owner adds ${drainerParent} (and all its sub-accounts) to the on-chain denylist`);
-  await ownerGuard.report("recipient", drainerParent, "payout account of a known airdrop-drainer campaign", "https://example.org/guard-demo/report-1");
+  await ownerGuard.report("recipient", drainerParent, "payout account of a known airdrop-drainer campaign", "https://example.org/pursestrings-demo/report-1");
 
   const state: DemoState = {
     network: opts.network,

@@ -1,9 +1,9 @@
 {
   "version": 1,
-  "description": "Known-bad NEAR accounts, NEP-141 tokens and domains. These entries are DEMO FIXTURES created for the Guard testnet/sandbox demo, not accusations against real projects. Point GUARD_SCAM_LIST_PATH or GUARD_SCAM_LIST_URL at your own list, or sync the on-chain denylist from a guard contract (list_denied).",
+  "description": "Known-bad NEAR accounts, NEP-141 tokens and domains. These entries are DEMO FIXTURES created for the PurseStrings testnet/sandbox demo, not accusations against real projects. Point GUARD_SCAM_LIST_PATH or GUARD_SCAM_LIST_URL at your own list, or sync the on-chain denylist from a PurseStrings contract (list_denied).",
   "entries": [
-    { "type": "domain", "value": "near-airdrop-claim.xyz", "reason": "demo fixture: wallet-drainer landing page used in the Guard demo", "source": "guard-demo" },
-    { "type": "domain", "value": "intents-near-claim.top", "reason": "demo fixture: fake NEAR Intents migration page", "source": "guard-demo" },
-    { "type": "account", "pattern": "^claim\\..*drainer.*\\.testnet$", "reason": "demo fixture: drainer payout accounts used in the Guard demo", "source": "guard-demo" }
+    { "type": "domain", "value": "near-airdrop-claim.xyz", "reason": "demo fixture: wallet-drainer landing page used in the PurseStrings demo", "source": "pursestrings-demo" },
+    { "type": "domain", "value": "intents-near-claim.top", "reason": "demo fixture: fake NEAR Intents migration page", "source": "pursestrings-demo" },
+    { "type": "account", "pattern": "^claim\\..*drainer.*\\.testnet$", "reason": "demo fixture: drainer payout accounts used in the PurseStrings demo", "source": "pursestrings-demo" }
   ]
 }

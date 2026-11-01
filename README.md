@@ -1,7 +1,9 @@
-# Guard: a policy firewall for AI-agent wallets on NEAR
+# PurseStrings: a policy firewall for AI-agent wallets on NEAR
 
-Guard lets you give an AI agent a NEAR budget without giving it your keys.
-The agent signs with a **function-call access key** that can only call the Guard contract. The contract enforces
+**Your agent carries the purse. You hold the strings.**
+
+PurseStrings lets you give an AI agent a NEAR budget without giving it your keys.
+The agent signs with a **function-call access key** that can only call the PurseStrings contract. The contract enforces
 **per-transaction and rolling 24-hour caps**, **recipient and token allow/deny lists**, a **pause switch**, and **human approval**
 for anything over the caps. Before the agent signs anything, an off-chain **risk layer** checks the receiver, the token, any link in the message
 that triggered the action, and NEAR Intents swap quotes (dry runs). It returns **ALLOW / WARN / BLOCK** with reasons.
@@ -21,12 +23,12 @@ failures:
   `usdt.tether-t0ken.near`, `near.org.claim-rewards.xyz`.
 - **Bad swaps**: quotes with 40% slippage, or quotes altered in transit.
 
-Guard limits the damage in two layers. They are independent, so an agent that bypasses one still hits the other.
+PurseStrings limits the damage in two layers. They are independent, so an agent that bypasses one still hits the other.
 
 | Layer | Where | Can the agent bypass it? | What it stops |
 |---|---|---|---|
 | Risk layer | TypeScript, next to the agent | Yes, if the agent's process is compromised | Scam tokens, look-alikes, phishing links, prompt injection, bad Intents quotes |
-| Guard contract | NEAR, on the vault account | **No**: the agent's key can only call the contract | Overspending (caps), denylisted receivers and tokens, unlisted tokens, everything while paused |
+| PurseStrings contract | NEAR, on the vault account | **No**: the agent's key can only call the contract | Overspending (caps), denylisted receivers and tokens, unlisted tokens, everything while paused |
 
 ## Try it
 
@@ -94,7 +96,7 @@ npm run check -- token <id> --network testnet --json
 
 | | |
 |---|---|
-| Vault with the Guard contract | [`vault.guard-owner-mvxpkwqz.testnet`](https://testnet.nearblocks.io/address/vault.guard-owner-mvxpkwqz.testnet) |
+| Vault with the PurseStrings contract | [`vault.guard-owner-mvxpkwqz.testnet`](https://testnet.nearblocks.io/address/vault.guard-owner-mvxpkwqz.testnet) |
 | Owner | `guard-owner-mvxpkwqz.testnet` |
 | Agent function-call key | `ed25519:8YSMRnKQkZvWuAuCUooF9mbd5Pf9Z8rXRd2zDCx78qHr`: receiver = vault, methods = `agent_transfer_near, agent_transfer_ft, agent_request_approval`, allowance 1 NEAR |
 | Fake "USDC" airdropped to the vault | [`usdc-airdrop.guard-owner-mvxpkwqz.testnet`](https://testnet.nearblocks.io/address/usdc-airdrop.guard-owner-mvxpkwqz.testnet) |
@@ -107,6 +109,43 @@ npm run check -- token <id> --network testnet --json
 
 Full logs: [`docs/demo-output-testnet.txt`](docs/demo-output-testnet.txt) and
 [`docs/demo-output-testnet-bypass.txt`](docs/demo-output-testnet-bypass.txt).
+
+## How PurseStrings differs from OutLayer, PolicyLayer and Coinbase Agentic Wallet
+
+Spending caps, allow/deny lists, a freeze switch and human approval are not new. [OutLayer agent custody](https://app.outlayer.ai/docs/agent-custody)
+(FastNEAR) already offers all of them on NEAR, and more: hourly and monthly caps, time-of-day windows, transaction-type
+capabilities, 2-of-3 style multi-approver thresholds, an audit log, and EVM and Solana addresses. We do not claim any of that as
+unique. What PurseStrings does differently:
+
+1. **The policy is a public contract on your own account, enforced by the NEAR runtime.** OutLayer evaluates an encrypted policy
+   inside its TEE ("Only the TEE can decrypt and evaluate them"); PolicyLayer and Coinbase enforce limits in their own
+   off-chain services. Here the rules are contract state anyone can read (`get_policy`, `get_agent`, `list_denied`), the code is
+   MIT, and the agent's key is limited by the protocol itself to three methods of that contract. No operator, TEE or gateway sits
+   in the trust path: if every off-chain part of PurseStrings stops, the caps still hold and the owner still controls the vault.
+   The rolling 24h cap is updated in the same contract call that sends the funds, so it stays exact under concurrent requests
+   (OutLayer's docs call their velocity limits "best-effort under concurrency"). Blocked attempts are recorded on chain as events.
+2. **It checks what the agent is about to do, not only how much.** Before anything is signed, the risk layer looks for look-alike
+   accounts and domains, fake NEP-141 tokens, phishing links, prompt-injection patterns in the message that triggered the action,
+   and verifies NEAR Intents 1Click quotes (signature, echo of the request, loss, slippage). OutLayer's agent-custody docs describe
+   no such checks. Coinbase lists KYT address screening; we found no checks of tokens, links or the triggering message in its docs.
+3. **The owner and the community stay in the loop on Telegram.** Over-cap requests arrive with Approve / Reject buttons and a
+   risk check of the receiver, every blocked attempt is reported, and anyone can run `/check` on an account, token or link in a
+   group chat. The on-chain denylist doubles as a shared blocklist: reporter accounts add entries with evidence.
+
+| | PurseStrings | OutLayer agent custody | PolicyLayer | Coinbase Agentic Wallet |
+|---|---|---|---|---|
+| Where the policy runs | Contract on the owner's NEAR account | Intel TDX TEE; policy stored encrypted on NEAR | Off-chain policy engine before signing | Coinbase infrastructure |
+| Agent credential | NEAR function-call key, limited by the protocol to 3 contract methods | API key; keys derived in the TEE (NEAR MPC) | Your wallet's key, behind the SDK | Coinbase-managed keys |
+| Caps | Per tx, rolling 24h | Per tx, hour, day, month, rate | Per tx, rolling budgets, velocity | Per tx, per session |
+| Approvals | Single owner (Telegram buttons, CLI) | Multi-approver threshold (NEP-413) | Not checked | Not checked |
+| Content risk checks | Look-alikes, scam tokens, links, prompt injection, 1Click quotes | None described | None described | Address screening (KYT) |
+| Chains | NEAR (testnet demo) | NEAR, EVM, Solana, Intents | EVM, Solana | Base, Solana, Polygon and others |
+| Status | Hackathon project, testnet only | Production service | Production service | Production service |
+
+Sources, read 2026-11-01: the OutLayer agent-custody docs linked above; PolicyLayer's public docs and blog
+(policylayer.com); Coinbase's Agentic Wallet docs (docs.cdp.coinbase.com/agentic-wallet) and launch coverage. Where a cell says
+"none described" or "not checked", we found nothing in those sources, which does not prove the feature is missing. Where OutLayer is ahead:
+multi-approver policies, finer time windows, many chains, and agents that never hold any key.
 
 ## Architecture
 
@@ -134,7 +173,7 @@ flowchart LR
     C5 --> EVM
     WALLET -->|ALLOW, or WARN + human yes:<br/>sign with function-call key| VAULT
     subgraph CHAIN[NEAR]
-        VAULT[Vault account<br/>Guard contract] -->|transfer / ft_transfer<br/>+ settle callback| DEST[Receiver / NEP-141 token]
+        VAULT[Vault account<br/>PurseStrings contract] -->|transfer / ft_transfer<br/>+ settle callback| DEST[Receiver / NEP-141 token]
         OWNER[Owner account<br/>full-access key] -->|policy, approve, pause| VAULT
         REP[Reporter accounts] -->|report with evidence| VAULT
     end
@@ -145,7 +184,7 @@ flowchart LR
 sequenceDiagram
     participant A as Agent (function-call key)
     participant R as Risk layer
-    participant G as Guard contract (vault)
+    participant G as PurseStrings contract (vault)
     participant O as Owner
     A->>R: transfer 0.8 NEAR to vendor
     R-->>A: ALLOW (trusted payee)
@@ -157,7 +196,7 @@ sequenceDiagram
     G->>G: re-check denylists, send, settle callback
 ```
 
-## The Guard contract (`contracts/guard`)
+## The PurseStrings contract (`contracts/guard`)
 
 Rust, `near-sdk` 5.29. It is deployed on the account that holds the funds (the vault).
 
@@ -207,7 +246,7 @@ What the key **cannot** do, enforced by the protocol and covered by `agent_key_c
 - sign anything after the owner calls `remove_agent`.
 
 What it **can** do, and the limits to be aware of:
-- Spend whatever the policy allows. Guard limits the damage; it does not judge intent. An agent tricked into paying an allowed
+- Spend whatever the policy allows. PurseStrings limits the damage; it does not judge intent. An agent tricked into paying an allowed
   receiver within its caps succeeds. That is why the risk layer exists and why caps should be small.
 - Burn gas, up to its allowance (1 NEAR by default), including on blocked attempts. When the allowance runs out, the key stops
   working (NEAR does not let you top up an existing key's allowance). The owner then registers a new key.
@@ -242,12 +281,12 @@ combines the checks for an action and returns the worst verdict.
 Indexer lookups are optional. If NearBlocks or FastNEAR is down or rate-limited, the check records "unknown" instead of failing.
 The canonical token list (`src/risk/known.ts`) was checked against RPC `ft_metadata` on 2026-11-01.
 
-**NEAR Intents.** Quotes are always requested with `dry: true`, so no deposit address is issued and nothing executes. Guard
+**NEAR Intents.** Quotes are always requested with `dry: true`, so no deposit address is issued and nothing executes. PurseStrings
 verifies the 1Click signature with the official `@defuse-protocol/one-click-sdk-typescript` (tested against a recorded real quote
 and a tampered copy). It then checks that the quote echoes exactly the requested recipient, refund address, assets and amount, and
 compares USD in/out and the 1Click reference prices. Intents has no testnet (Q-007), so these calls hit mainnet in read-only mode.
 
-**EVM tokens.** When a swap's destination is a bridged EVM token (`nep141:base-0x….omft.near`), Guard asks the Base
+**EVM tokens.** When a swap's destination is a bridged EVM token (`nep141:base-0x….omft.near`), PurseStrings asks the Base
 token-verdict API over HTTP (`GUARD_EVM_VERDICT_URL`, with `{chain}` and `{address}` placeholders) and maps
 SAFE/CAUTION/DANGER to ALLOW/WARN/BLOCK. If it is not configured or unreachable, the result is WARN, never ALLOW. Tests use a local
 mock HTTP server.
@@ -283,12 +322,12 @@ events from NEAR RPC `tx`. Risk-layer refusals never reach the chain, so the age
 transfer by the protocol; a normal payment; a prompt-injected scam stopped before signing; an over-cap invoice blocked on chain
 and approved from the owner's (console) Telegram chat with a real `approve_request`; a compromised agent stopped by the
 contract; `/check` in a group chat; and NEAR Intents quotes. Mainnet facts and the 1Click quote are recordings, so every run
-tells the same story. `npm run demo:record` records it into [`docs/video/`](docs/video): an asciicast (`guard-demo.cast`), a
+tells the same story. `npm run demo:record` records it into [`docs/video/`](docs/video): an asciicast (`pursestrings-demo.cast`), a
 plain transcript, and `viewer.html`, a self-contained player with the terminal on the left and the Telegram chat on a phone on
 the right. Screenshots of each scene are in [`docs/video/shots/`](docs/video/shots).
 
-**The demo video:** [`docs/video/guard-demo.mp4`](docs/video/guard-demo.mp4) (2:17, 1080p, English voice-over and subtitles,
-[`guard-demo.en.srt`](docs/video/guard-demo.en.srt)). It is this recording rendered frame by frame, on a local NEAR sandbox node,
+**The demo video:** [`docs/video/pursestrings-demo.mp4`](docs/video/pursestrings-demo.mp4) (2:18, 1080p, English voice-over and subtitles,
+[`pursestrings-demo.en.srt`](docs/video/pursestrings-demo.en.srt)). It is this recording rendered frame by frame, on a local NEAR sandbox node,
 with the Telegram bot in console mode. The voice is synthetic (macOS `say`).
 
 ## Tests
@@ -304,7 +343,7 @@ with the Telegram bot in console mode. The voice is synthetic (macOS `say`).
 - **Everything in this repository was written during the hackathon window**, starting 2026-11-01. There is no pre-hackathon
   baseline; `git log` shows the full history.
 - **What was built when** (all in the window; see `git log`):
-  - Nov 1: Guard contract, sandbox tests, risk layer, NEAR Intents and EVM checks, agent wrapper, testnet deployment, demo.
+  - Nov 1: PurseStrings contract, sandbox tests, risk layer, NEAR Intents and EVM checks, agent wrapper, testnet deployment, demo.
   - Nov 1 (the plan's Nov 7–11 work, done early): Telegram front end (`src/telegram`, console mode, tests), rolling 24h
     cap with an in-place migration (testnet vault upgraded), the paced video demo and its recording (`docs/video`).
 - **Libraries and tools:** `near-sdk`, `near-contract-standards`, `near-sandbox` and `near-api` (Rust, tests), `cargo-near`, `near-api-js` v7,
@@ -312,7 +351,11 @@ with the Telegram bot in console mode. The voice is synthetic (macOS `say`).
   from `cargo near new`.
 - **AI-assisted:** the code was written with Claude Code (Q-005).
 - **Related, separate project:** EVM token verdicts come from our Base token-verdict API, a separate service that is not part of
-  this repository. Guard only calls it over HTTP, and the tests mock it.
+  this repository. PurseStrings only calls it over HTTP, and the tests mock it.
+- **Name:** the project was called "Guard" until 2026-11-01 and was renamed to PurseStrings (see [`docs/NAMING.md`](docs/NAMING.md)).
+  Internal identifiers keep the old name: the contract crate `near-guard` in `contracts/guard`, the Rust and TypeScript types
+  (`Guard`, `GuardBot`, `AgentGuard`, `GuardedWallet`), the NEP-297 event standard `nearguard`, the `GUARD_*` environment
+  variables, the `.guard-local/` state directory and the testnet account names (`guard-owner-mvxpkwqz.testnet`).
 - **Data sources:** free public endpoints only (FastNEAR RPC, API and transactions API, NearBlocks API, 1Click API). No paid APIs.
 
 ### Known limitations and next steps

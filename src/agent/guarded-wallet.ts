@@ -2,7 +2,7 @@
  * Agent-side wrapper. Every action goes through two independent layers:
  *
  *  1. Off-chain risk layer (RiskEngine): BLOCK -> refuse to sign; WARN -> ask a human; ALLOW -> continue.
- *  2. On-chain Guard contract: the agent's function-call key can only call the guard, which enforces
+ *  2. On-chain PurseStrings contract: the agent's function-call key can only call the contract, which enforces
  *     caps and allow/deny lists no matter what the off-chain layer said.
  *
  * If the contract blocks for a soft reason (over a cap, not on an allowlist), the wallet can escalate:

@@ -1,7 +1,7 @@
 /**
- * npm run demo:video   The whole Guard story in one paced, deterministic terminal run, for recording.
+ * npm run demo:video   The whole PurseStrings story in one paced, deterministic terminal run, for recording.
  *
- * Runs on a local NEAR sandbox node: the real Guard contract, a real agent function-call key,
+ * Runs on a local NEAR sandbox node: the real PurseStrings contract, a real agent function-call key,
  * the real risk layer and the Telegram bot in console mode (owner approval is a real
  * `approve_request` signed by the owner key on the sandbox). Nothing touches testnet or mainnet:
  * mainnet facts for /check and the NEAR Intents quote are recordings from 2026-11-01.
@@ -84,7 +84,7 @@ function showAssessment(a: Assessment, max = 5) {
 
 function showOnChain(o: WalletOutcome) {
   const r = o.onChain?.result;
-  if (r) out(`  ${bold("guard contract")}  ${tag(r.status)} ${r.code}: ${r.reason} ${dim(`(tx ${shortTx(o.onChain!.txHash)})`)}`);
+  if (r) out(`  ${bold("contract")}        ${tag(r.status)} ${r.code}: ${r.reason} ${dim(`(tx ${shortTx(o.onChain!.txHash)})`)}`);
   const e = o.escalation?.result;
   if (e) out(`  ${bold("escalation")}      ${tag(e.status)} request #${e.request_id} filed on chain; only the owner can execute it ${dim(`(tx ${shortTx(o.escalation!.txHash)})`)}`);
 }
@@ -99,8 +99,8 @@ function recordedOneClick(): typeof fetch {
 // ---------------------------------------------------------------------------------------------
 
 const { Sandbox, DEFAULT_ACCOUNT_ID, DEFAULT_PRIVATE_KEY } = await import("near-sandbox");
-out(bold("GUARD") + "  a policy firewall for AI-agent wallets on NEAR");
-out(dim("local NEAR sandbox node · real Guard contract · real agent key · Telegram bot in console mode"));
+out(bold("PurseStrings") + "  a policy firewall for AI-agent wallets on NEAR");
+out(dim("local NEAR sandbox node · real PurseStrings contract · real agent key · Telegram bot in console mode"));
 out(dim("starting the node and deploying the vault…"));
 const sandbox = await Sandbox.start({});
 try {
@@ -121,7 +121,7 @@ async function story(s: DemoState, provider: JsonRpcProvider) {
   const guard = new AgentGuard({ vaultId: s.vault.id, rpcUrl: s.rpcUrl, network: "sandbox", agentKey: s.agent.key, publicKey: s.agent.publicKey });
   const scamList = await ScamList.load();
   const denied = await guard.listDenied("recipient");
-  scamList.add(denied.map((d) => ({ type: "account" as const, value: d.account_id, reason: d.entry.reason, source: "guard denylist" })));
+  scamList.add(denied.map((d) => ({ type: "account" as const, value: d.account_id, reason: d.entry.reason, source: "vault denylist" })));
   const trusted = [s.payee.id, s.vendor.id];
   const engine = new RiskEngine({ data, scamList, trustedAccounts: trusted, trustedTokens: s.allowedTokens });
   const wallet = new GuardedWallet({ engine, guard, approver: denyAll, escalateSoftBlocks: true });
@@ -137,7 +137,7 @@ async function story(s: DemoState, provider: JsonRpcProvider) {
   const chat = new ConsoleChat({ chatNames: { [OWNER]: "owner (Telegram, private chat)", [GROUP]: "NEAR builders (Telegram group)" }, osc: OSC, width: W });
   const checker = new Checker({ data: offlineData({ sandbox: data }), scamList, trustedAccounts: trusted, trustedTokens: s.allowedTokens });
   const owner = new ContractOwnerControl(s);
-  const bot = new GuardBot({ chat, checker, owner, ownerUserIds: [OWNER], botUsername: "GuardBot" });
+  const bot = new GuardBot({ chat, checker, owner, ownerUserIds: [OWNER], botUsername: "PurseStringsBot" });
   const messages = inbox(s);
 
   const run = async (w: GuardedWallet, msg: { from: string; text: string }, label: string) => {
@@ -163,7 +163,7 @@ async function story(s: DemoState, provider: JsonRpcProvider) {
   };
 
   // 1 ---------------------------------------------------------------------------------------
-  await scene("The agent gets a budget, not your keys", "Guard contract on the vault account; the agent signs with a limited function-call key");
+  await scene("The agent gets a budget, not your keys", "PurseStrings contract on the vault account; the agent signs with a limited function-call key");
   const ak = (await provider.viewAccessKey({ accountId: s.vault.id, publicKey: s.agent.publicKey })) as unknown as {
     permission: { FunctionCall?: { receiver_id: string; method_names: string[]; allowance?: string | null } } | string;
   };
@@ -195,14 +195,14 @@ async function story(s: DemoState, provider: JsonRpcProvider) {
   await scene("A prompt-injected scam", "the agent is gullible on purpose and tries to pay the drainer");
   const injected = await run(wallet, messages[1]!, "injected");
   await pause(600);
-  out(dim("  Guard notifies the owner on Telegram:"));
+  out(dim("  PurseStrings notifies the owner on Telegram:"));
   await reportOutcome(bot, injected, "sandbox", "treasury-agent");
   await pause(2200);
 
   // 4 ---------------------------------------------------------------------------------------
   await scene("Over the cap: the owner decides from Telegram", "the contract blocks it on chain; the request goes to the owner's phone");
   await run(wallet, messages[2]!, "over-cap");
-  out(dim("  Guard sends the request to the owner on Telegram, with a risk check of the receiver:"));
+  out(dim("  PurseStrings sends the request to the owner on Telegram, with a risk check of the receiver:"));
   await bot.syncPending();
   await pause(2500);
   const m = chat.lastWithButtons(OWNER)!;
@@ -220,11 +220,11 @@ async function story(s: DemoState, provider: JsonRpcProvider) {
   await pause(2200);
 
   // 6 ---------------------------------------------------------------------------------------
-  await scene("Community guard in a Telegram group", "anyone can paste an account, token or link and get a verdict");
+  await scene("Community checks in a Telegram group", "anyone can paste an account, token or link and get a verdict");
   for (const [user, text] of [
-    ["alice", "/check@GuardBot wrap-near.near"],
-    ["bob", "/check@GuardBot https://near.org.claim-rewards.xyz/connect"],
-    ["carol", "/check@GuardBot wrap.near"],
+    ["alice", "/check@PurseStringsBot wrap-near.near"],
+    ["bob", "/check@PurseStringsBot https://near.org.claim-rewards.xyz/connect"],
+    ["carol", "/check@PurseStringsBot wrap.near"],
   ] as const) {
     chat.showUser(GROUP, user, text);
     await pause(700);
@@ -261,7 +261,7 @@ async function story(s: DemoState, provider: JsonRpcProvider) {
   out(bold("  On chain after the story"));
   out(`  executed ${agent.executed} · blocked attempts recorded ${agent.blocked} · approved by the owner 1 · scams paid 0`);
   out(cyan("━".repeat(W)));
-  out(bold("  Guard") + dim("  caps · deny lists · owner approval on Telegram · scam and phishing checks"));
+  out(bold("  PurseStrings") + dim("  caps · deny lists · owner approval on Telegram · scam and phishing checks"));
   out(dim("  Built at NEAR HACKATHON 2026 · MIT · testnet only"));
   if (OSC) process.stdout.write(oscEvent({ type: "end" }));
   await pause(2500);

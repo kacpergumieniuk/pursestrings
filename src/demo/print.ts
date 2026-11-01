@@ -69,7 +69,7 @@ export function eventPrinter(network: Network) {
       case "on_chain":
       case "escalated": {
         const r = e.outcome.result;
-        const label = e.type === "escalated" ? "escalation" : "guard contract";
+        const label = e.type === "escalated" ? "escalation" : "contract";
         console.log(`  ${bold(label)} ${verdictTag(r.status)} ${r.code}: ${r.reason}`);
         console.log(`    ${dim("tx")} ${cyan(explorerTx(network, e.outcome.txHash))}`);
         for (const ev of e.outcome.events) {

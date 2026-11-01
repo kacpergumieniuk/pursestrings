@@ -28,7 +28,7 @@ interface TransferBlockedEvent {
   reason: string;
 }
 
-/** Parses Guard's NEP-297 `transfer_blocked` events out of transaction logs. */
+/** Parses PurseStrings' NEP-297 `transfer_blocked` events out of transaction logs. */
 export function blockedEventsFromLogs(logs: string[]): TransferBlockedEvent[] {
   const out: TransferBlockedEvent[] = [];
   for (const l of logs) {

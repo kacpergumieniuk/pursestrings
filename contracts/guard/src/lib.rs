@@ -1,4 +1,4 @@
-//! Guard: an on-chain policy firewall for AI-agent and community wallets on NEAR.
+//! PurseStrings: an on-chain policy firewall for AI-agent and community wallets on NEAR.
 //!
 //! The contract is deployed on the account that holds the funds (the "vault").
 //! The owner (a separate account) controls the policy. Each agent gets a

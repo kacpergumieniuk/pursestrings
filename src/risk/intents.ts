@@ -237,7 +237,7 @@ export async function checkIntentsQuote(req: SwapRequest, opts: IntentsOptions =
   }
 
   if (quote.depositAddress) {
-    flags.push({ code: "NOT_A_DRY_RUN", severity: "critical", message: "quote carries a deposit address; Guard only accepts dry-run quotes here" });
+    flags.push({ code: "NOT_A_DRY_RUN", severity: "critical", message: "quote carries a deposit address; PurseStrings only accepts dry-run quotes here" });
   }
   if ((quote.timeEstimate ?? 0) > 3600) {
     flags.push({ code: "SLOW_SETTLEMENT", severity: "low", message: `estimated ${Math.round((quote.timeEstimate ?? 0) / 60)} min to settle` });

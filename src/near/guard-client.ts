@@ -1,5 +1,5 @@
 /**
- * Thin client for the Guard contract (near-api-js v7).
+ * Thin client for the PurseStrings contract (near-api-js v7).
  *
  * - `AgentGuard` signs with the agent's function-call key on the vault account.
  *   It can only call `agent_transfer_near`, `agent_transfer_ft` and `agent_request_approval`.

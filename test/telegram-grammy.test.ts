@@ -12,7 +12,7 @@ const OWNER = 1001;
 const botInfo = {
   id: 42,
   is_bot: true as const,
-  first_name: "Guard",
+  first_name: "PurseStrings",
   username: "GuardTestBot",
   can_join_groups: true,
   can_read_all_group_messages: false,

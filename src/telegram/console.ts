@@ -55,7 +55,7 @@ export class ConsoleChat implements ChatApi {
 
   private render(m: ConsoleMessage, label: string, previous?: string) {
     const inner = this.width - 4;
-    const head = `${this.opts.botName ?? "Guard bot"} → ${this.chatName(m.chatId)}`;
+    const head = `${this.opts.botName ?? "PurseStrings bot"} → ${this.chatName(m.chatId)}`;
     const lines: string[] = [];
     lines.push(`  ${tgBlue("╭─")} ${tgBlue(head)} ${dim(label)}`);
     let body = m.text.split("\n");

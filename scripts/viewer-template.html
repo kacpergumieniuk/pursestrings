@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Guard demo viewer</title>
+<title>PurseStrings demo viewer</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
   :root { --bg: #0b0f14; --panel: #11161d; --line: #1f2833; --text: #d7dde5; --dim: #7d8794; --accent: #5ac8fa; --green: #4ade80; --yellow: #facc15; --red: #f87171; --cyan: #67e8f9; }
@@ -55,13 +55,13 @@
 <body>
 <div id="stage">
   <header>
-    <div class="brand">GUARD<small>policy firewall for AI-agent wallets on NEAR</small></div>
-    <div class="caption" id="caption"><div class="n">NEAR HACKATHON 2026 · security track</div><div class="t">One injected message can drain an AI agent's wallet.</div><div class="s">Guard gives the agent a budget on NEAR, not your keys.</div></div>
+    <div class="brand">PurseStrings<small>policy firewall for AI-agent wallets on NEAR</small></div>
+    <div class="caption" id="caption"><div class="n">NEAR HACKATHON 2026 · security track</div><div class="t">One injected message can drain an AI agent's wallet.</div><div class="s">PurseStrings gives the agent a budget on NEAR, not your keys.</div></div>
   </header>
   <main>
-    <div id="term"><div class="bar"><i></i><i></i><i></i>&nbsp; npm run demo:video · local NEAR sandbox, real Guard contract</div><div id="lines"></div></div>
+    <div id="term"><div class="bar"><i></i><i></i><i></i>&nbsp; npm run demo:video · local NEAR sandbox, real PurseStrings contract</div><div id="lines"></div></div>
     <div id="phone">
-      <div class="top"><div class="avatar">G</div><div><div class="who" id="chatname">Guard bot</div><div class="sub" id="chatsub">bot</div></div></div>
+      <div class="top"><div class="avatar">P</div><div><div class="who" id="chatname">PurseStrings bot</div><div class="sub" id="chatsub">bot</div></div></div>
       <div id="msgs"></div>
       <div id="toast"></div>
     </div>
@@ -170,10 +170,10 @@ function render() {
     document.getElementById("caption").innerHTML = `<div class="n">Scene ${state.caption.n} of 7</div><div class="t">${esc(state.caption.title)}</div><div class="s">${esc(state.caption.subtitle)}</div>`;
   }
   const c = state.current != null ? state.chats[state.current] : null;
-  document.getElementById("chatname").textContent = c ? (c.id < 0 ? "NEAR builders" : "Guard bot") : "Guard bot";
-  document.getElementById("chatsub").textContent = c ? (c.id < 0 ? "group · 1,204 members · Guard bot is a member" : "bot · private chat with the vault owner") : "bot";
+  document.getElementById("chatname").textContent = c ? (c.id < 0 ? "NEAR builders" : "PurseStrings bot") : "PurseStrings bot";
+  document.getElementById("chatsub").textContent = c ? (c.id < 0 ? "group · 1,204 members · PurseStrings bot is a member" : "bot · private chat with the vault owner") : "bot";
   const box = document.getElementById("msgs");
-  if (!c) { box.innerHTML = `<div style="align-self:center;color:#6c7883;font-size:16px;margin-bottom:40%">No messages yet: Guard writes here when the owner needs to act.</div>`; }
+  if (!c) { box.innerHTML = `<div style="align-self:center;color:#6c7883;font-size:16px;margin-bottom:40%">No messages yet: PurseStrings writes here when the owner needs to act.</div>`; }
   else {
     box.innerHTML = c.msgs.slice(-7).map((m) => {
       const flash = state.flash && state.flash.id === m.id && state.now < state.flash.until ? " flash" : "";

@@ -1,7 +1,7 @@
 /**
  * Configurable known-scam list: accounts, tokens and domains, exact or regex.
  * Sources (merged): data/scam-list.json, GUARD_SCAM_LIST_PATH, GUARD_SCAM_LIST_URL,
- * plus entries pulled from a guard contract's on-chain denylist.
+ * plus entries pulled from a PurseStrings contract's on-chain denylist.
  */
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";

@@ -1,5 +1,5 @@
 /**
- * `/check <account|token|link|text>`: runs Guard's risk layer on whatever a user pastes
+ * `/check <account|token|link|text>`: runs the PurseStrings risk layer on whatever a user pastes
  * and returns ALLOW / WARN / BLOCK with reasons. Used by the owner and by community group chats.
  */
 import { checkContext } from "../risk/context";
@@ -177,7 +177,7 @@ export function formatCheckReport(r: CheckReport, maxReasons = 6): string {
   if (seen.size > maxReasons) lines.push(`…and ${serious.length - maxReasons} more`);
   const notes = [...new Set(flags.filter((f) => f.severity === "low" || f.severity === "info").map((f) => f.code))].slice(0, 4);
   if (notes.length) lines.push(`Notes: ${notes.join(", ")}`);
-  if (r.verdict === "BLOCK") lines.push("Do not send funds or connect a wallet. Guard never asks for keys or seed phrases.");
+  if (r.verdict === "BLOCK") lines.push("Do not send funds or connect a wallet. PurseStrings never asks for keys or seed phrases.");
   else if (r.verdict === "WARN") lines.push("Proceed only if you know this counterparty.");
   return lines.join("\n");
 }

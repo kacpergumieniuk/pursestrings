@@ -1,11 +1,11 @@
 /**
- * Creates throwaway testnet accounts with the public faucet, deploys the Guard and the fake token,
+ * Creates throwaway testnet accounts with the public faucet, deploys the PurseStrings contract and the fake token,
  * registers the agent and writes everything to .guard-local/testnet.json (gitignored, 0600).
  * Keys are never printed. Testnet only: this script refuses any other network.
  *
  *   npm run testnet:setup            # creates a new environment if none exists
  *   npm run testnet:setup -- --force # creates a fresh one
- *   npm run testnet:setup -- --redeploy # upgrades the Guard code on the existing vault and runs
+ *   npm run testnet:setup -- --redeploy # upgrades the PurseStrings code on the existing vault and runs
  *                                       # migrate_spend_windows in the same transaction (state is kept)
  */
 import "../src/demo/env";
@@ -34,7 +34,7 @@ if (existing && process.argv.includes("--redeploy")) {
     waitUntil: "FINAL",
   });
   const migrated = getTransactionLastResult(r);
-  console.log(`redeployed Guard to ${existing.vault.id} and migrated ${String(migrated)} agent(s): ${explorerAccount("testnet", existing.vault.id)}`);
+  console.log(`redeployed the PurseStrings contract to ${existing.vault.id} and migrated ${String(migrated)} agent(s): ${explorerAccount("testnet", existing.vault.id)}`);
   console.log(`  tx ${explorerTx("testnet", (r as { transaction: { hash: string } }).transaction.hash)}`);
   process.exit(0);
 }
@@ -48,7 +48,7 @@ saveState(state);
 console.log(`\nsaved to ${statePath("testnet")} (keys stay in that file)`);
 for (const [label, id] of [
   ["owner", state.owner.id],
-  ["vault (Guard contract)", state.vault.id],
+  ["vault (PurseStrings contract)", state.vault.id],
   ["payee", state.payee.id],
   ["vendor", state.vendor.id],
   ["fake USDC token", state.scamToken],

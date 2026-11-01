@@ -112,5 +112,5 @@ export const BOT_COMMANDS = [
   { command: "pause", description: "Owner: emergency stop" },
   { command: "unpause", description: "Owner: resume" },
   { command: "whoami", description: "Show your Telegram user id" },
-  { command: "help", description: "How Guard works" },
+  { command: "help", description: "How PurseStrings works" },
 ];

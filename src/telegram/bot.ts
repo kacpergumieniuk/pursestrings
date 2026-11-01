@@ -1,5 +1,5 @@
 /**
- * GuardBot: the chat front end of Guard, independent of Telegram itself.
+ * GuardBot: the chat front end of PurseStrings, independent of Telegram itself.
  *
  *  - Anyone, in a private chat or a group: `/check <account|token|link|text>` -> ALLOW / WARN / BLOCK with reasons.
  *    In a private chat, a pasted value without a command is checked too.
@@ -49,7 +49,7 @@ interface Tracked {
 }
 
 const HELP =
-  "Guard checks NEAR accounts, tokens and links before you or your agent pays.\n" +
+  "PurseStrings checks NEAR accounts, tokens and links before you or your agent pays.\n" +
   "/check <account | token | link | text>: ALLOW, WARN or BLOCK with reasons. Works in groups too.\n" +
   "In this private chat you can also just paste the account, token or link.\n" +
   "/whoami: your Telegram user id";
@@ -113,7 +113,7 @@ export class GuardBot {
       case "whoami":
         await this.reply(
           m.chatId,
-          `Your Telegram user id is ${m.userId}.` + (this.isOwner(m.userId) ? " You are an owner of this Guard." : " Owners set TELEGRAM_OWNER_IDS to their id to receive approvals."),
+          `Your Telegram user id is ${m.userId}.` + (this.isOwner(m.userId) ? " You are an owner of this PurseStrings vault." : " Owners set TELEGRAM_OWNER_IDS to their id to receive approvals."),
         );
         return;
       case "pending":
@@ -200,7 +200,7 @@ export class GuardBot {
     const lines = [
       `🟡 Approval needed: request #${p.id} on ${network}`,
       `Agent "${p.agent_name}" wants to send ${describeAmount(p.asset, p.amount)} to ${p.receiver_id}.`,
-      `Stopped by the Guard contract: ${p.code}.`,
+      `Stopped by the PurseStrings contract: ${p.code}.`,
       `Agent's justification (untrusted text): "${oneLine(p.justification)}"`,
     ];
     if (this.opts.precheckReceivers !== false) {
@@ -223,7 +223,7 @@ export class GuardBot {
       this.blockedSeen.add(key);
     }
     const who = b.agentName ? `Agent "${b.agentName}"` : "An agent";
-    const by = b.source === "risk_layer" ? "Guard's risk layer, before signing (nothing was sent)" : "the Guard contract (attempt recorded on chain)";
+    const by = b.source === "risk_layer" ? "the PurseStrings risk layer, before signing (nothing was sent)" : "the PurseStrings contract (attempt recorded on chain)";
     const lines = [`⛔ Blocked: ${who} tried to ${b.action}.`, `Stopped by ${by}${b.code ? `: ${b.code}` : ""}.`];
     for (const r of b.reasons.slice(0, 5)) lines.push(`• ${oneLine(r, 200)}`);
     if (b.txUrl) lines.push(`Tx: ${b.txUrl}`);

@@ -47,7 +47,7 @@ describe("GuardBot: /check", () => {
     expect(chat.last().text).toMatch(/^🔴 BLOCK: link/);
   });
 
-  it("works in groups as a community guard, but ignores plain chatter and other bots' commands", async () => {
+  it("works in groups as a community checker, but ignores plain chatter and other bots' commands", async () => {
     const { chat, bot } = setup();
     await bot.handleMessage(inGroup(STRANGER, "/check@GuardTestBot usdc-airdrop.owner.testnet"));
     expect(chat.last()).toMatchObject({ chatId: GROUP });
@@ -186,7 +186,7 @@ describe("GuardBot: blocked-attempt notices", () => {
     expect(chat.to(OWNER)).toHaveLength(1);
     expect(chat.last().text).toBe(
       '⛔ Blocked: Agent "treasury-agent" tried to send 1 NEAR to claim.drainer.testnet.\n' +
-        "Stopped by the Guard contract (attempt recorded on chain): RECIPIENT_DENYLISTED.\n" +
+        "Stopped by the PurseStrings contract (attempt recorded on chain): RECIPIENT_DENYLISTED.\n" +
         "• recipient drainer.testnet is denylisted\n" +
         "Tx: https://testnet.nearblocks.io/txns/abc",
     );
@@ -207,7 +207,7 @@ describe("GuardBot: blocked-attempt notices", () => {
       },
     } as unknown as WalletOutcome;
     await reportOutcome(bot, refused, "testnet", "treasury-agent");
-    expect(chat.last().text).toContain("Stopped by Guard's risk layer, before signing (nothing was sent): BLOCK.");
+    expect(chat.last().text).toContain("Stopped by the PurseStrings risk layer, before signing (nothing was sent): BLOCK.");
     expect(chat.last().text).toContain("• PROMPT_INJECTION_SUSPECTED: message matches 3 injection patterns");
     expect(chat.last().text).not.toContain("URGENCY");
 

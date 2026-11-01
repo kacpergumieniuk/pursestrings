@@ -1,7 +1,7 @@
 /**
  * The agent's "brain" turns an incoming message into a proposed action.
  *
- * Guard does not trust the brain: it is assumed to be gullible or prompt-injected.
+ * PurseStrings does not trust the brain: it is assumed to be gullible or prompt-injected.
  * `ScriptedBrain` is deterministic and needs no API key, and it obeys whatever the message
  * says, exactly like a successfully injected LLM would. `OpenAICompatibleBrain` is an
  * optional adapter for any OpenAI-compatible endpoint (for example NEAR AI Cloud).
@@ -45,13 +45,13 @@ export class ScriptedBrain implements Brain {
     const amount = m.groups.amount!;
     const sym = (m.groups.sym ?? "NEAR").toUpperCase();
     if (!m.groups.token && sym === "NEAR") {
-      return { kind: "transfer_near", receiverId, amount: toUnits(amount, 24), memo: "guard-demo" };
+      return { kind: "transfer_near", receiverId, amount: toUnits(amount, 24), memo: "pursestrings-demo" };
     }
     const token = m.groups.token
       ? ((await ctx.resolveToken?.(m.groups.token)) ?? { tokenId: m.groups.token, decimals: 6 })
       : ctx.tokens[sym];
     if (!token) return null;
-    return { kind: "transfer_ft", tokenId: token.tokenId, receiverId, amount: toUnits(amount, token.decimals), memo: "guard-demo" };
+    return { kind: "transfer_ft", tokenId: token.tokenId, receiverId, amount: toUnits(amount, token.decimals), memo: "pursestrings-demo" };
   }
 }
 
