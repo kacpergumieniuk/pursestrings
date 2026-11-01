@@ -442,6 +442,16 @@ fn multiple_agents_have_separate_budgets() {
 }
 
 #[test]
+fn amounts_are_readable_in_reasons() {
+    assert_eq!(fmt_amount("near", 2 * 10u128.pow(23)), "0.2 NEAR");
+    assert_eq!(fmt_amount("near", 10u128.pow(24)), "1 NEAR");
+    assert_eq!(fmt_amount("usdc.testnet", 5), "5 units of usdc.testnet");
+    let mut g = setup();
+    let r = send_near(&mut g, AGENT_A, "alice.testnet", near(3)).unwrap();
+    assert_eq!(r.reason, "3 NEAR exceeds the per-transaction cap of 2 NEAR");
+}
+
+#[test]
 fn ownership_transfer() {
     let mut g = setup();
     as_owner(T0);

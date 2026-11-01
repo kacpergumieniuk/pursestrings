@@ -283,6 +283,21 @@ fn check_text(s: &str, what: &str) {
     require!(s.len() <= MAX_TEXT_LEN, format!("{what} is too long (max {MAX_TEXT_LEN} bytes)"));
 }
 
+/// Human-readable amount for messages: `0.2 NEAR` for NEAR, raw units for tokens.
+fn fmt_amount(asset: &str, amount: u128) -> String {
+    if asset != NEAR_ASSET {
+        return format!("{amount} units of {asset}");
+    }
+    let one = 10u128.pow(24);
+    let frac = format!("{:024}", amount % one);
+    let frac = frac.trim_end_matches('0');
+    if frac.is_empty() {
+        format!("{} NEAR", amount / one)
+    } else {
+        format!("{}.{} NEAR", amount / one, frac)
+    }
+}
+
 fn pk_string(pk: &PublicKey) -> String {
     String::from(pk)
 }
@@ -459,7 +474,7 @@ impl Guard {
             GuardResult {
                 status: "executed".into(),
                 code: "OK".into(),
-                reason: format!("sent {} of {} to {}", amount.0, asset, receiver_id),
+                reason: format!("sent {} to {}", fmt_amount(&asset, amount.0), receiver_id),
                 request_id: None,
             }
         } else {
@@ -967,19 +982,23 @@ impl Guard {
             Block::RecipientNotAllowlisted => format!("recipient {receiver} is not on the recipient allowlist"),
             Block::AssetNotPermitted => format!("this agent has no budget for {asset}"),
             Block::OverTxCap => format!(
-                "amount {amount} exceeds the per-transaction cap {}",
-                limit.map(|l| l.per_tx.0).unwrap_or(0)
+                "{} exceeds the per-transaction cap of {}",
+                fmt_amount(asset, amount),
+                fmt_amount(asset, limit.map(|l| l.per_tx.0).unwrap_or(0))
             ),
             Block::OverDailyCap => {
                 let spent = agent.map(|a| Self::spent_today(a, asset, today)).unwrap_or(0);
                 format!(
-                    "amount {amount} + spent today {spent} exceeds the daily cap {}",
-                    limit.map(|l| l.per_day.0).unwrap_or(0)
+                    "{} + {} spent today exceeds the daily cap of {}",
+                    fmt_amount(asset, amount),
+                    fmt_amount(asset, spent),
+                    fmt_amount(asset, limit.map(|l| l.per_day.0).unwrap_or(0))
                 )
             }
             Block::InsufficientBalance => format!(
-                "amount {amount} would dip into storage staking or the reserve (spendable {})",
-                self.spendable_near()
+                "{} would dip into storage staking or the reserve (spendable {})",
+                fmt_amount(asset, amount),
+                fmt_amount(NEAR_ASSET, self.spendable_near())
             ),
         }
     }

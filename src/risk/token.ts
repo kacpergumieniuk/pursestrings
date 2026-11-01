@@ -144,6 +144,7 @@ export async function checkToken(tokenId: string, opts: TokenCheckOptions): Prom
       const top10 = share(10);
       facts.top1Share = top1;
       facts.top10Share = top10;
+      facts.topHoldersSeen = top.length;
       if (top1 > t.top1MaxShare) {
         flags.push({ code: "HOLDER_CONCENTRATION", severity: "high", message: `top holder (${top[0]!.account}) owns ${(top1 * 100).toFixed(1)}% of supply` });
       } else if (top10 > t.top10MaxShare) {
@@ -174,7 +175,10 @@ export async function checkToken(tokenId: string, opts: TokenCheckOptions): Prom
     }
   }
 
-  const holders = await data.holdersCount?.(id);
+  const counted = await data.holdersCount?.(id);
+  // Indexers lag on brand-new tokens: never report fewer holders than we can see in the top list.
+  const seen = typeof facts.topHoldersSeen === "number" ? facts.topHoldersSeen : 0;
+  const holders = counted === undefined ? undefined : Math.max(counted, seen);
   if (holders !== undefined) {
     facts.holders = holders;
     if (holders < t.minHolders) flags.push({ code: "FEW_HOLDERS", severity: "medium", message: `only ${holders} holder(s)` });

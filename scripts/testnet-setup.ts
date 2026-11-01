@@ -5,15 +5,29 @@
  *
  *   npm run testnet:setup            # creates a new environment if none exists
  *   npm run testnet:setup -- --force # creates a fresh one
+ *   npm run testnet:setup -- --redeploy # upgrades the Guard code on the existing vault (state is kept)
  */
-import { JsonRpcProvider } from "near-api-js";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { Account, JsonRpcProvider } from "near-api-js";
 import { explorerAccount } from "../src/near/guard-client";
-import { loadState, saveState, setupDemo, statePath, TESTNET_RPC, testnetFactory } from "../src/demo/setup";
+import { loadState, ROOT, saveState, setupDemo, statePath, TESTNET_RPC, testnetFactory } from "../src/demo/setup";
 
 const rpcUrl = process.env.GUARD_TESTNET_RPC ?? TESTNET_RPC;
-if (!/testnet/.test(rpcUrl)) throw new Error(`refusing to run against a non-testnet RPC: ${rpcUrl}`);
+// Safety: refuse anything that is not testnet (never touch mainnet accounts or funds).
+const status = (await (
+  await fetch(rpcUrl, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "status", params: [] }) })
+).json()) as { result?: { chain_id?: string } };
+if (status.result?.chain_id !== "testnet") throw new Error(`refusing to run: ${rpcUrl} reports chain_id ${status.result?.chain_id}`);
 
 const existing = loadState("testnet");
+if (existing && process.argv.includes("--redeploy")) {
+  const wasm = new Uint8Array(readFileSync(join(ROOT, "contracts/target/near/near_guard/near_guard.wasm")));
+  const vault = new Account(existing.vault.id, new JsonRpcProvider({ url: rpcUrl }), existing.vault.key);
+  const r = await vault.deployContract(wasm);
+  console.log(`redeployed Guard to ${existing.vault.id}: ${explorerAccount("testnet", existing.vault.id)} (tx ${(r as { transaction: { hash: string } }).transaction.hash})`);
+  process.exit(0);
+}
 if (existing && !process.argv.includes("--force")) {
   console.log(`testnet environment already exists (${statePath("testnet")}): vault ${existing.vault.id}. Use --force for a new one.`);
   process.exit(0);
