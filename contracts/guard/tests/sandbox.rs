@@ -198,13 +198,7 @@ async fn agent_call(e: &Env, method: &str, args: Value) -> (Value, Vec<String>) 
 }
 
 async fn near_balance(e: &Env, who: &AccountId) -> u128 {
-    Tokens::account(who.clone())
-        .near_balance()
-        .fetch_from(&e.net)
-        .await
-        .unwrap()
-        .total
-        .as_yoctonear()
+    near_balance_of(&e.net, who).await
 }
 
 async fn ft_balance(e: &Env, token: &AccountId, who: &AccountId) -> u128 {
@@ -489,4 +483,212 @@ async fn agent_key_cannot_escape_the_contract() {
         "revoked key must not sign: {after_revoke:?}"
     );
     drop(e.sandbox);
+}
+
+/// Guard as deployed before the rolling window (commit 7c32380, UTC-day `spent` layout),
+/// built with `cargo near build non-reproducible-wasm` from `git archive 7c32380 contracts`.
+const OLD_GUARD_WASM: &[u8] = include_bytes!("fixtures/near_guard_7c32380.wasm");
+
+/// Upgrading a vault that runs the UTC-day code: a `DeployContract` plus a
+/// `migrate_spend_windows` call in one transaction keeps the agent's recorded spend counted.
+#[tokio::test]
+async fn upgrade_from_utc_day_layout_keeps_spend() {
+    let new_wasm = build("guard", "near_guard");
+    let sandbox = near_sandbox::Sandbox::start_sandbox().await.unwrap();
+    let net = NetworkConfig::from_rpc_url("sandbox", sandbox.rpc_addr.parse().unwrap());
+    let genesis = Signer::from_secret_key(
+        near_sandbox::config::DEFAULT_GENESIS_ACCOUNT_PRIVATE_KEY
+            .parse()
+            .unwrap(),
+    )
+    .unwrap();
+    let owner = create(&sandbox, "owner.sandbox", 50).await;
+    let alice = create(&sandbox, "alice.sandbox", 10).await;
+    // `vault` is upgraded the right way; `stale` gets the new code without the migration.
+    let vault = create(&sandbox, "vault.sandbox", 50).await;
+    let stale = create(&sandbox, "stale.sandbox", 50).await;
+    let agent_sk = near_api::signer::generate_secret_key().unwrap();
+    let agent_pk = agent_sk.public_key().to_string();
+    let agent = Signer::from_secret_key(agent_sk).unwrap();
+    let one = NearToken::from_near(1).as_yoctonear();
+
+    let agent_send = |v: AccountId, amount: u128| {
+        let (net, agent, alice) = (net.clone(), agent.clone(), alice.clone());
+        async move {
+            Contract(v.clone())
+                .call_function(
+                    "agent_transfer_near",
+                    json!({ "receiver_id": alice, "amount": amount.to_string() }),
+                )
+                .transaction()
+                .gas(NearGas::from_tgas(100))
+                .with_signer(v, agent)
+                .send_to(&net)
+                .await
+                .unwrap()
+        }
+    };
+    let near_limit = |v: AccountId| {
+        let (net, agent_pk) = (net.clone(), agent_pk.clone());
+        async move {
+            let a: Value = Contract(v)
+                .call_function("get_agent", json!({ "public_key": agent_pk }))
+                .read_only()
+                .fetch_from(&net)
+                .await
+                .unwrap()
+                .data;
+            (a["limits"][0].clone(), a)
+        }
+    };
+
+    for v in [&vault, &stale] {
+        Contract::deploy(v.clone())
+            .use_code(OLD_GUARD_WASM.to_vec())
+            .with_init_call("new", json!({ "owner_id": owner }))
+            .unwrap()
+            .with_signer(genesis.clone())
+            .send_to(&net)
+            .await
+            .unwrap()
+            .assert_success();
+        owner_call(
+            &net,
+            &genesis,
+            &owner,
+            v,
+            "add_agent",
+            json!({
+                "public_key": agent_pk, "name": "treasury-bot",
+                "limits": [{ "asset": "near", "per_tx": (2 * one).to_string(),
+                             "per_day": (5 * one).to_string() }]
+            }),
+        )
+        .await;
+        for _ in 0..2 {
+            let r: Value = agent_send(v.clone(), 2 * one)
+                .await
+                .assert_success()
+                .json()
+                .unwrap();
+            assert_eq!(r["status"], "executed", "{r}");
+        }
+        let (l, _) = near_limit(v.clone()).await;
+        assert_eq!(l["spent_today"], (4 * one).to_string());
+        assert!(l.get("next_release_at").is_none(), "old code: {l}");
+    }
+
+    // The upgrade: one transaction signed by the vault account with two actions,
+    // DeployContract(new code) + FunctionCall(migrate_spend_windows).
+    let migrated: u32 = Contract::deploy(vault.clone())
+        .use_code(new_wasm.clone())
+        .with_init_call("migrate_spend_windows", json!({}))
+        .unwrap()
+        .with_signer(genesis.clone())
+        .send_to(&net)
+        .await
+        .unwrap()
+        .assert_success()
+        .json()
+        .unwrap();
+    assert_eq!(migrated, 1);
+
+    let (l, a) = near_limit(vault.clone()).await;
+    assert_eq!(l["spent_today"], (4 * one).to_string(), "{a}");
+    assert_eq!(l["remaining_today"], one.to_string(), "{a}");
+    assert!(l["next_release_at"].is_string(), "{a}");
+    assert_eq!(a["name"], "treasury-bot");
+    assert_eq!(a["executed"], 2);
+
+    // The old spend still counts against the (now rolling) cap.
+    let r: Value = agent_send(vault.clone(), 2 * one)
+        .await
+        .assert_success()
+        .json()
+        .unwrap();
+    assert_eq!(r["code"], "OVER_DAILY_CAP", "{r}");
+    assert!(
+        r["reason"]
+            .as_str()
+            .unwrap()
+            .contains("spent in the last 24h"),
+        "{r}"
+    );
+    let r: Value = agent_send(vault.clone(), one)
+        .await
+        .assert_success()
+        .json()
+        .unwrap();
+    assert_eq!(r["status"], "executed", "{r}");
+
+    // A second call is a no-op, and only the vault itself may call it.
+    let again: u32 = Contract(vault.clone())
+        .call_function("migrate_spend_windows", json!({}))
+        .transaction()
+        .with_signer(vault.clone(), genesis.clone())
+        .send_to(&net)
+        .await
+        .unwrap()
+        .assert_success()
+        .json()
+        .unwrap();
+    assert_eq!(again, 0);
+    Contract(vault.clone())
+        .call_function("migrate_spend_windows", json!({}))
+        .transaction()
+        .with_signer(owner.clone(), genesis.clone())
+        .send_to(&net)
+        .await
+        .unwrap()
+        .assert_failure();
+    assert_eq!(
+        near_limit(vault.clone()).await.0["spent_today"],
+        (5 * one).to_string()
+    );
+
+    // New code without the migration fails closed: the agent cannot move funds and the
+    // view errors, until the migration runs.
+    Contract::deploy(stale.clone())
+        .use_code(new_wasm)
+        .without_init_call()
+        .with_signer(genesis.clone())
+        .send_to(&net)
+        .await
+        .unwrap()
+        .assert_success();
+    let before = near_balance_of(&net, &alice).await;
+    agent_send(stale.clone(), one).await.assert_failure();
+    assert_eq!(near_balance_of(&net, &alice).await, before);
+    let view = Contract(stale.clone())
+        .call_function("get_agent", json!({ "public_key": agent_pk }))
+        .read_only::<Value>()
+        .fetch_from(&net)
+        .await;
+    assert!(view.is_err(), "{view:?}");
+    let migrated: u32 = Contract(stale.clone())
+        .call_function("migrate_spend_windows", json!({}))
+        .transaction()
+        .with_signer(stale.clone(), genesis.clone())
+        .send_to(&net)
+        .await
+        .unwrap()
+        .assert_success()
+        .json()
+        .unwrap();
+    assert_eq!(migrated, 1);
+    assert_eq!(
+        near_limit(stale.clone()).await.0["spent_today"],
+        (4 * one).to_string()
+    );
+    drop(sandbox);
+}
+
+async fn near_balance_of(net: &NetworkConfig, who: &AccountId) -> u128 {
+    Tokens::account(who.clone())
+        .near_balance()
+        .fetch_from(net)
+        .await
+        .unwrap()
+        .total
+        .as_yoctonear()
 }
