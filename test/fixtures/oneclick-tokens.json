@@ -1,0 +1,42 @@
+[
+ {
+  "assetId": "nep141:wrap.near",
+  "decimals": 24,
+  "blockchain": "near",
+  "symbol": "wNEAR",
+  "price": 4.4,
+  "priceUpdatedAt": "2026-11-01T10:20:31.154Z",
+  "contractAddress": "wrap.near",
+  "coingeckoId": "wrapped-near"
+ },
+ {
+  "assetId": "nep141:17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  "decimals": 6,
+  "blockchain": "near",
+  "symbol": "USDC",
+  "price": 1,
+  "priceUpdatedAt": "2026-11-01T10:20:31.154Z",
+  "contractAddress": "17208628f84f5d6ad33f0da3bbbeb27ffcb398eac501a31bd6ad2011e36133a1",
+  "coingeckoId": "usd-coin"
+ },
+ {
+  "assetId": "nep141:usdt.tether-token.near",
+  "decimals": 6,
+  "blockchain": "near",
+  "symbol": "USDT",
+  "price": 0.999441,
+  "priceUpdatedAt": "2026-11-01T10:20:31.154Z",
+  "contractAddress": "usdt.tether-token.near",
+  "coingeckoId": "tether"
+ },
+ {
+  "assetId": "nep141:base-0x833589fcd6edb6e08f4c7c32d4f71b54bda02913.omft.near",
+  "decimals": 6,
+  "blockchain": "base",
+  "symbol": "USDC",
+  "price": 1,
+  "priceUpdatedAt": "2026-11-01T10:20:31.154Z",
+  "contractAddress": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+  "coingeckoId": "usd-coin"
+ }
+]
