@@ -16,7 +16,8 @@
     "check": "tsx scripts/check.ts",
     "testnet:setup": "tsx scripts/testnet-setup.ts",
     "demo": "tsx scripts/demo.ts",
-    "demo:sandbox": "tsx scripts/demo.ts --sandbox"
+    "demo:sandbox": "tsx scripts/demo.ts --sandbox",
+    "owner": "tsx scripts/owner.ts"
   },
   "dependencies": {
     "@defuse-protocol/one-click-sdk-typescript": "^0.1.26",

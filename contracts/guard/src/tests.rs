@@ -343,6 +343,23 @@ fn denylisted_recipient_cannot_be_escalated() {
 }
 
 #[test]
+fn hard_blocks_win_over_soft_ones() {
+    // Unknown token (soft) + denylisted recipient (hard): the hard block is reported and cannot be escalated.
+    let mut g = setup();
+    as_owner(T0);
+    g.report(ListKind::Recipient, acc("drainer.testnet"), "known drainer".into(), None);
+    as_agent(AGENT_A, T0);
+    let PromiseOrValue::Value(r) = g.agent_transfer_ft(acc("fake-usdc.testnet"), acc("claim.drainer.testnet"), U128(1), None)
+    else {
+        panic!("expected block")
+    };
+    assert_eq!(r.code, "RECIPIENT_DENYLISTED");
+    let r = g.agent_request_approval("fake-usdc.testnet".into(), acc("claim.drainer.testnet"), U128(1), None, "x".into());
+    assert_eq!(r.status, "blocked");
+    assert!(g.list_pending(None, None).is_empty());
+}
+
+#[test]
 #[should_panic(expected = "recipient is denylisted")]
 fn approval_rechecks_denylist() {
     let mut g = setup();

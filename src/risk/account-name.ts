@@ -63,7 +63,7 @@ export function checkAccountName(rawId: string, opts: AccountNameOptions): Check
   }
 
   if (known.includes(lower)) {
-    flags.push({ code: "KNOWN_ACCOUNT", severity: "info", message: `${id} is a known canonical account` });
+    flags.push({ code: "KNOWN_ACCOUNT", severity: "info", message: `${id} is a known canonical or owner-trusted account` });
     return result("account_name", id, flags);
   }
   if (isImplicitAccount(id)) {

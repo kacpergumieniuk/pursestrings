@@ -54,9 +54,9 @@ function collect<T>(outcome: Outcome): TxOutcome<T> {
   const logs = [...o.transaction_outcome.outcome.logs, ...o.receipts_outcome.flatMap((r) => r.outcome.logs)];
   const events = logs
     .filter((l) => l.startsWith("EVENT_JSON:"))
-    .map((l) => JSON.parse(l.slice("EVENT_JSON:".length)) as { standard: string; event: string; data: unknown[] })
+    .map((l) => JSON.parse(l.slice("EVENT_JSON:".length)) as { standard: string; event: string; data: unknown })
     .filter((e) => e.standard === "nearguard")
-    .map((e) => ({ event: e.event, data: e.data?.[0] }));
+    .map((e) => ({ event: e.event, data: Array.isArray(e.data) ? e.data[0] : e.data }));
   return { result: getTransactionLastResult(outcome) as T, txHash: o.transaction.hash, logs, events };
 }
 

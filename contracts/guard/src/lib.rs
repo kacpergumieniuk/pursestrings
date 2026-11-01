@@ -907,17 +907,25 @@ impl Guard {
         if *receiver == env::current_account_id() {
             return Err(Block::SelfTransfer);
         }
-        if asset != NEAR_ASSET {
-            let token: AccountId = asset.parse().map_err(|_| Block::AssetNotPermitted)?;
-            if self.token_deny_entry(&token).is_some() {
+        // Hard violations first, so a soft one can never mask them (and be escalated).
+        let token: Option<AccountId> = if asset == NEAR_ASSET {
+            None
+        } else {
+            Some(asset.parse().map_err(|_| Block::AssetNotPermitted)?)
+        };
+        if let Some(t) = &token {
+            if self.token_deny_entry(t).is_some() {
                 return Err(Block::TokenDenylisted);
-            }
-            if self.token_mode == ListMode::AllowlistOnly && !self.token_allow.contains(&token) {
-                return Err(Block::TokenNotAllowlisted);
             }
         }
         if self.recipient_deny_entry(receiver).is_some() {
             return Err(Block::RecipientDenylisted);
+        }
+        // Soft violations: a human may approve these.
+        if let Some(t) = &token {
+            if self.token_mode == ListMode::AllowlistOnly && !self.token_allow.contains(t) {
+                return Err(Block::TokenNotAllowlisted);
+            }
         }
         if self.recipient_mode == ListMode::AllowlistOnly && !self.recipient_allow.contains(receiver) {
             return Err(Block::RecipientNotAllowlisted);
