@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Guard demo viewer</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root { --bg: #0b0f14; --panel: #11161d; --line: #1f2833; --text: #d7dde5; --dim: #7d8794; --accent: #5ac8fa; --green: #4ade80; --yellow: #facc15; --red: #f87171; --cyan: #67e8f9; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #05070a; overflow: hidden; }
+  #stage { position: absolute; left: 0; top: 0; width: 1920px; height: 1080px; transform-origin: 0 0; background: var(--bg); color: var(--text);
+           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; }
+  header { height: 150px; padding: 26px 48px 0; border-bottom: 1px solid var(--line); display: flex; align-items: flex-start; gap: 36px; }
+  .brand { font-weight: 800; font-size: 34px; letter-spacing: .5px; color: #fff; white-space: nowrap; }
+  .brand small { display: block; font-weight: 500; font-size: 17px; color: var(--dim); letter-spacing: 0; margin-top: 6px; }
+  .caption { flex: 1; transition: opacity .35s; }
+  .caption .n { font-size: 17px; color: var(--accent); font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; }
+  .caption .t { font-size: 40px; font-weight: 750; color: #fff; margin-top: 4px; line-height: 1.1; }
+  .caption .s { font-size: 21px; color: var(--dim); margin-top: 8px; }
+  main { display: flex; gap: 36px; padding: 28px 48px 40px; height: calc(1080px - 150px); }
+  #term { flex: 1; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px; overflow: hidden; position: relative;
+          font: 17.5px/1.42 "SF Mono", Menlo, "JetBrains Mono", Consolas, monospace; white-space: pre; }
+  #term .bar { position: absolute; top: 0; left: 0; right: 0; height: 34px; background: #161d26; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 8px; padding-left: 14px; font: 13px -apple-system, sans-serif; color: var(--dim); }
+  #term .bar i { width: 12px; height: 12px; border-radius: 50%; background: #3a4350; display: inline-block; }
+  #lines { position: absolute; left: 22px; right: 22px; top: 46px; bottom: 16px; overflow: hidden; display: flex; flex-direction: column; justify-content: flex-end; }
+  #lines > div { white-space: pre-wrap; word-break: break-all; min-height: 1.42em; flex: none; }
+  .b { font-weight: 700; color: #fff; } .d { color: var(--dim); } .c31 { color: var(--red); } .c32 { color: var(--green); } .c33 { color: var(--yellow); } .c36 { color: var(--cyan); }
+  .c39 { color: var(--accent); } .c245 { color: var(--dim); }
+  .tg { display: inline-block; color: var(--accent); }
+  #phone { width: 560px; flex: none; background: #0e1621; border-radius: 46px; border: 10px solid #1d2733; position: relative; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+  #phone .top { height: 92px; background: #17212b; display: flex; align-items: center; gap: 16px; padding: 20px 24px 0; border-bottom: 1px solid #0b1118; }
+  #phone .avatar { width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, #2aabee, #229ed9); display: grid; place-items: center; font-weight: 800; color: #fff; font-size: 22px; }
+  #phone .who { font-size: 21px; font-weight: 650; color: #fff; } #phone .sub { font-size: 15px; color: #6c7883; margin-top: 2px; }
+  #msgs { flex: 1; padding: 18px 16px 22px; display: flex; flex-direction: column; justify-content: flex-end; gap: 10px; overflow: hidden;
+          background: #0e1621 radial-gradient(circle at 20% 10%, rgba(42,171,238,.06), transparent 40%); }
+  .msg { max-width: 92%; padding: 10px 14px 8px; border-radius: 16px; font-size: 16.5px; line-height: 1.38; white-space: pre-wrap; word-break: break-word; position: relative; animation: pop .25s ease-out; }
+  .msg.bot { background: #182533; color: #e9eef3; align-self: flex-start; border-bottom-left-radius: 4px; }
+  .msg.user { background: #2b5278; color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+  .msg.other { background: #182533; color: #e9eef3; align-self: flex-start; border-bottom-left-radius: 4px; }
+  .msg .name { font-weight: 650; font-size: 15px; color: #64b5ef; margin-bottom: 3px; }
+  .msg .meta { font-size: 12.5px; color: #6c7883; text-align: right; margin-top: 2px; }
+  .msg.flash { animation: flash .9s ease-out; }
+  .kb { display: flex; gap: 6px; margin-top: 6px; align-self: flex-start; width: 92%; }
+  .kb div { flex: 1; text-align: center; padding: 11px 6px; border-radius: 10px; background: rgba(43,82,120,.55); color: #fff; font-size: 16px; font-weight: 600; transition: transform .15s, background .15s; }
+  .kb div.pressed { background: #2aabee; transform: scale(.95); }
+  #toast { position: absolute; top: 108px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.78); color: #fff; padding: 10px 18px; border-radius: 12px; font-size: 16px; opacity: 0; transition: opacity .25s; }
+  #controls { position: fixed; bottom: 10px; left: 10px; display: flex; gap: 8px; align-items: center; font: 13px -apple-system, sans-serif; color: #aaa; z-index: 10; }
+  #controls button { background: #222b36; color: #ddd; border: 1px solid #333; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
+  body.clean #controls { display: none; }
+  body.terminal #phone { display: none; }
+  @keyframes pop { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
+  @keyframes flash { 0% { box-shadow: 0 0 0 3px rgba(42,171,238,.9); } 100% { box-shadow: 0 0 0 0 rgba(42,171,238,0); } }
+</style>
+</head>
+<body>
+<div id="stage">
+  <header>
+    <div class="brand">GUARD<small>policy firewall for AI-agent wallets on NEAR</small></div>
+    <div class="caption" id="caption"><div class="n">NEAR HACKATHON 2026 · security track</div><div class="t">One injected message can drain an AI agent's wallet.</div><div class="s">Guard gives the agent a budget on NEAR, not your keys.</div></div>
+  </header>
+  <main>
+    <div id="term"><div class="bar"><i></i><i></i><i></i>&nbsp; npm run demo:video · local NEAR sandbox, real Guard contract</div><div id="lines"></div></div>
+    <div id="phone">
+      <div class="top"><div class="avatar">G</div><div><div class="who" id="chatname">Guard bot</div><div class="sub" id="chatsub">bot</div></div></div>
+      <div id="msgs"></div>
+      <div id="toast"></div>
+    </div>
+  </main>
+</div>
+<div id="controls"><button id="play">▶ play (space)</button><button id="restart">⟲ restart</button><span id="time">0.0 s</span><span>· speed</span><select id="speed"><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select><span>· ?scene=N · ?clean=1 · ?layout=terminal</span></div>
+<script>
+const CAST = /*CAST_JSON*/null;
+const lines = CAST.trim().split("\n");
+const header = JSON.parse(lines[0]);
+const events = lines.slice(1).map((l) => JSON.parse(l)).filter((e) => e[1] === "o");
+const END = events.length ? events[events.length - 1][0] + 2 : 0;
+const params = new URLSearchParams(location.search);
+const SPLIT = params.get("layout") !== "terminal";
+if (!SPLIT) document.body.classList.add("terminal");
+if (params.get("clean")) document.body.classList.add("clean");
+
+// ---- scale the 1920x1080 stage to the window
+function fit() { const s = Math.min(innerWidth / 1920, innerHeight / 1080); const st = document.getElementById("stage"); st.style.transform = `scale(${s})`; st.style.left = `${(innerWidth - 1920 * s) / 2}px`; st.style.top = `${(innerHeight - 1080 * s) / 2}px`; }
+addEventListener("resize", fit); fit();
+
+// ---- state rebuilt from the stream
+let state;
+function reset() {
+  state = { idx: 0, buf: "", termLines: [[]], style: {}, inBubble: false, chats: {}, current: null, caption: null, toastUntil: 0, pressed: null, flash: null };
+  render();
+}
+function chat(id, name) { return state.chats[id] ??= { id, name, msgs: [] }; }
+function onEvent(e, t) {
+  if (e.type === "bubble_start") { if (SPLIT) state.inBubble = true; return; }
+  if (e.type === "bubble_end") { state.inBubble = false; return; }
+  if (e.type === "scene") { state.caption = e; return; }
+  if (e.type === "toast") { state.toast = e.text; state.toastUntil = t + 1.6; return; }
+  if (e.type === "send" || e.type === "edit" || e.type === "user" || e.type === "tap") {
+    const c = chat(e.chatId, e.chat); state.current = c.id;
+    if (e.type === "send") c.msgs.push({ id: e.messageId, kind: "bot", text: e.text, buttons: e.buttons });
+    if (e.type === "user") c.msgs.push({ kind: e.chatId < 0 ? "other" : "user", name: e.user, text: e.text });
+    if (e.type === "edit") { const m = c.msgs.find((x) => x.id === e.messageId); if (m) { m.text = e.text; m.buttons = e.buttons; m.edited = true; state.flash = { id: e.messageId, until: t + 0.9 }; } }
+    if (e.type === "tap") state.pressed = { id: e.messageId, data: e.data, until: t + 1.2 };
+  }
+}
+function feed(data, t) {
+  state.buf += data;
+  let s = state.buf, i = 0, out = "";
+  const flushText = () => { if (out) { writeText(out); out = ""; } };
+  while (i < s.length) {
+    if (s[i] === "\x1b") {
+      if (s[i + 1] === "]") {
+        const end = s.indexOf("\x07", i);
+        if (end < 0) break;
+        flushText();
+        const body = s.slice(i + 2, end);
+        if (body.startsWith("1337;GuardChat=")) { try { onEvent(JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(body.slice(15)), (c) => c.charCodeAt(0)))), t); } catch {} }
+        i = end + 1; continue;
+      }
+      if (s[i + 1] === "[") {
+        const m = /^\x1b\[([0-9;]*)([A-Za-z])/.exec(s.slice(i));
+        if (!m) break;
+        flushText();
+        if (m[2] === "m") sgr(m[1]);
+        i += m[0].length; continue;
+      }
+      if (i + 1 >= s.length) break;
+      i += 2; continue;
+    }
+    out += s[i]; i++;
+  }
+  flushText();
+  state.buf = s.slice(i);
+}
+function sgr(params) {
+  const p = params === "" ? [0] : params.split(";").map(Number);
+  for (let k = 0; k < p.length; k++) {
+    const v = p[k];
+    if (v === 0) state.style = {};
+    else if (v === 1) state.style = { ...state.style, b: true };
+    else if (v === 2) state.style = { ...state.style, d: true };
+    else if (v >= 30 && v <= 37) state.style = { ...state.style, c: v };
+    else if (v === 38 && p[k + 1] === 5) { state.style = { ...state.style, c: p[k + 2] }; k += 2; }
+  }
+}
+function writeText(txt) {
+  if (state.inBubble) return;
+  const parts = txt.replace(/\r\n/g, "\n").replace(/\r/g, "").split("\n");
+  parts.forEach((p, n) => {
+    if (n > 0) state.termLines.push([]);
+    if (p) state.termLines[state.termLines.length - 1].push({ t: p, s: state.style });
+  });
+  if (state.termLines.length > 400) state.termLines = state.termLines.slice(-200);
+}
+function advanceTo(t) {
+  while (state.idx < events.length && events[state.idx][0] <= t) { feed(events[state.idx][2], events[state.idx][0]); state.idx++; }
+  state.now = t;
+}
+
+// ---- rendering
+const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+function span(seg) { const cls = [seg.s.b && "b", seg.s.d && "d", seg.s.c && "c" + seg.s.c].filter(Boolean).join(" "); return cls ? `<span class="${cls}">${esc(seg.t)}</span>` : esc(seg.t); }
+let lastCaption = null;
+function render() {
+  const term = document.getElementById("lines");
+  const maxLines = 60;
+  term.innerHTML = state.termLines.slice(-maxLines).map((l) => `<div>${l.map(span).join("")}</div>`).join("");
+  if (state.caption && state.caption !== lastCaption) {
+    lastCaption = state.caption;
+    document.getElementById("caption").innerHTML = `<div class="n">Scene ${state.caption.n} of 7</div><div class="t">${esc(state.caption.title)}</div><div class="s">${esc(state.caption.subtitle)}</div>`;
+  }
+  const c = state.current != null ? state.chats[state.current] : null;
+  document.getElementById("chatname").textContent = c ? (c.id < 0 ? "NEAR builders" : "Guard bot") : "Guard bot";
+  document.getElementById("chatsub").textContent = c ? (c.id < 0 ? "group · 1,204 members · Guard bot is a member" : "bot · private chat with the vault owner") : "bot";
+  const box = document.getElementById("msgs");
+  if (!c) { box.innerHTML = `<div style="align-self:center;color:#6c7883;font-size:16px;margin-bottom:40%">No messages yet: Guard writes here when the owner needs to act.</div>`; }
+  else {
+    box.innerHTML = c.msgs.slice(-7).map((m) => {
+      const flash = state.flash && state.flash.id === m.id && state.now < state.flash.until ? " flash" : "";
+      let h = `<div class="msg ${m.kind}${flash}">${m.kind === "other" ? `<div class="name">${esc(m.name)}</div>` : ""}${esc(m.text)}<div class="meta">${m.edited ? "edited · " : ""}${m.kind === "user" ? "✓✓" : ""}</div></div>`;
+      if (m.buttons && m.buttons.length) h += `<div class="kb">${m.buttons.flat().map((b) => `<div class="${state.pressed && state.pressed.id === m.id && state.pressed.data === b.data && state.now < state.pressed.until ? "pressed" : ""}">${esc(b.text)}</div>`).join("")}</div>`;
+      return h;
+    }).join("");
+  }
+  const toast = document.getElementById("toast");
+  toast.textContent = state.toast || ""; toast.style.opacity = state.now < state.toastUntil ? 1 : 0;
+  document.getElementById("time").textContent = `${(state.now || 0).toFixed(1)} / ${END.toFixed(1)} s`;
+}
+
+// ---- playback
+let playing = false, t0 = 0, base = 0, speed = Number(params.get("speed") || 1);
+document.getElementById("speed").value = String(speed);
+function seek(t) { reset(); advanceTo(t); render(); base = t; }
+function tick() {
+  if (!playing) return;
+  const t = base + ((performance.now() - t0) / 1000) * speed;
+  advanceTo(t); render();
+  if (t >= END) { playing = false; document.getElementById("play").textContent = "▶ play (space)"; return; }
+  requestAnimationFrame(tick);
+}
+function play() { if (playing) { base = state.now; playing = false; document.getElementById("play").textContent = "▶ play (space)"; return; } if (state.now >= END) seek(0); t0 = performance.now(); playing = true; document.getElementById("play").textContent = "❚❚ pause (space)"; requestAnimationFrame(tick); }
+document.getElementById("play").onclick = play;
+document.getElementById("restart").onclick = () => { playing = false; seek(0); };
+document.getElementById("speed").onchange = (e) => { base = state.now; t0 = performance.now(); speed = Number(e.target.value); };
+addEventListener("keydown", (e) => { if (e.code === "Space") { e.preventDefault(); play(); } if (e.key === "r") { playing = false; seek(0); } });
+
+/** Time of the end of scene n (just before scene n+1 starts, or the end). */
+function sceneEnd(n) {
+  const starts = [];
+  for (const [t, , d] of events) for (const m of d.matchAll(/\x1b\]1337;GuardChat=([^\x07]*)\x07/g)) { try { const e = JSON.parse(new TextDecoder().decode(Uint8Array.from(atob(m[1]), (c) => c.charCodeAt(0)))); if (e.type === "scene") starts[e.n] = t; } catch {} }
+  return starts[n + 1] != null ? starts[n + 1] - 0.05 : END;
+}
+reset();
+if (params.get("scene")) seek(sceneEnd(Number(params.get("scene"))));
+else if (params.get("t")) seek(Number(params.get("t")));
+else { seek(0); if (params.get("autoplay")) setTimeout(play, 800); }
+window.__guardViewer = { seek, sceneEnd, END };
+</script>
+</body>
+</html>

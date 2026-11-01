@@ -4,7 +4,15 @@
  */
 import type { Button, ChatApi, OutgoingMessage } from "./chat";
 
-const useColor = () => process.stdout.isTTY && !process.env.NO_COLOR || process.env.FORCE_COLOR === "1";
+const useColor = () => (process.stdout.isTTY || process.env.FORCE_COLOR === "1") && !process.env.NO_COLOR;
+
+/**
+ * Invisible terminal markers (OSC 1337, ignored by terminals) that carry each chat event as JSON,
+ * so a recording of the terminal can also drive a phone-style chat view (docs/video/viewer.html).
+ */
+export function oscEvent(e: Record<string, unknown>): string {
+  return `\x1b]1337;GuardChat=${Buffer.from(JSON.stringify(e)).toString("base64")}\x07`;
+}
 const paint = (code: string) => (s: string) => (useColor() ? `\x1b[${code}m${s}\x1b[0m` : s);
 const dim = paint("2");
 const bold = paint("1");
@@ -25,6 +33,8 @@ export interface ConsoleChatOptions {
   write?: (s: string) => void;
   width?: number;
   botName?: string;
+  /** Emit OSC chat-event markers around each bubble (for recordings). */
+  osc?: boolean;
 }
 
 export class ConsoleChat implements ChatApi {
@@ -68,14 +78,25 @@ export class ConsoleChat implements ChatApi {
       lines.push(`  ${tgBlue("│")} ${row}`);
     }
     lines.push(`  ${tgBlue("╰─")}`);
-    this.write(lines.join("\n") + "\n");
+    this.emit(lines.join("\n") + "\n", { type: previous === undefined ? "send" : "edit", chatId: m.chatId, chat: this.chatName(m.chatId), messageId: m.messageId, text: m.text, buttons: m.buttons });
+  }
+
+  private emit(rendered: string, event: Record<string, unknown>) {
+    if (!this.opts.osc) return this.write(rendered);
+    this.write(oscEvent(event) + oscEvent({ type: "bubble_start" }) + rendered + oscEvent({ type: "bubble_end" }));
+  }
+
+  /** Records a simulated button tap (for recordings). */
+  showTap(m: ConsoleMessage, button: Button) {
+    this.emit(`  ${dim(`(owner taps "${button.text}")`)}\n`, { type: "tap", chatId: m.chatId, messageId: m.messageId, data: button.data, text: button.text });
   }
 
   /** Prints what a user typed, as a chat bubble. */
   showUser(chatId: number, userName: string, text: string) {
-    this.write(`  ${grey("╭─")} ${blue(userName)} ${grey("in " + this.chatName(chatId))}\n`);
-    for (const l of text.split("\n")) for (const w of wrap(l, this.width - 4)) this.write(`  ${grey("│")} ${w}\n`);
-    this.write(`  ${grey("╰─")}\n`);
+    const out = [`  ${grey("╭─")} ${blue(userName)} ${grey("in " + this.chatName(chatId))}`];
+    for (const l of text.split("\n")) for (const w of wrap(l, this.width - 4)) out.push(`  ${grey("│")} ${w}`);
+    out.push(`  ${grey("╰─")}`);
+    this.emit(out.join("\n") + "\n", { type: "user", chatId, chat: this.chatName(chatId), user: userName, text });
   }
 
   async send(chatId: number, msg: OutgoingMessage): Promise<number> {
@@ -94,7 +115,7 @@ export class ConsoleChat implements ChatApi {
 
   async answerCallback(callbackId: string, text?: string): Promise<void> {
     this.callbacks.push({ callbackId, text });
-    if (text) this.write(`  ${dim(`(toast: ${text})`)}\n`);
+    if (text) this.emit(`  ${dim(`(toast: ${text})`)}\n`, { type: "toast", text });
   }
 
   /** The most recent message with buttons, optionally in one chat. */

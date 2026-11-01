@@ -4,7 +4,7 @@ import { explorerTx } from "../near/guard-client";
 import type { AgentAction, Assessment } from "../risk/engine";
 import type { Network, Verdict } from "../risk/types";
 
-const useColor = process.stdout.isTTY && !process.env.NO_COLOR;
+const useColor = (process.stdout.isTTY || process.env.FORCE_COLOR === "1") && !process.env.NO_COLOR;
 const c = (code: number) => (s: string) => (useColor ? `\x1b[${code}m${s}\x1b[0m` : s);
 export const bold = c(1);
 export const dim = c(2);

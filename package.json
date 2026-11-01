@@ -19,7 +19,9 @@
     "demo:sandbox": "tsx scripts/demo.ts --sandbox",
     "owner": "tsx scripts/owner.ts",
     "bot": "tsx scripts/bot.ts",
-    "bot:console": "tsx scripts/bot.ts --console"
+    "bot:console": "tsx scripts/bot.ts --console",
+    "demo:video": "tsx scripts/demo-video.ts",
+    "demo:record": "tsx scripts/record-demo.ts"
   },
   "dependencies": {
     "@defuse-protocol/one-click-sdk-typescript": "^0.1.26",
