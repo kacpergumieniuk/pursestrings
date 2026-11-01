@@ -7,8 +7,11 @@ use near_sdk::{PromiseResult, RuntimeFeesConfig, test_vm_config, testing_env};
 const AGENT_A: &str = "ed25519:4vJ9JU1bJJE96FWSJKvHsmmFADCg4gpZQff4P3bkLKi";
 const AGENT_B: &str = "ed25519:8qbHbw2BbbTHBW1sbeqakYXVKRQM8Ne7pLK7m6CVfeR";
 const STRANGER_KEY: &str = "ed25519:CktRuQ2mttgRGkXJtyksdKHjUdc2C4TgDzyB98oEzy8";
-const DAY: u64 = 86_400 * 1_000_000_000;
-const T0: u64 = 1_793_500_000 * 1_000_000_000; // 2026-11-01
+const HOUR: u64 = 3_600 * 1_000_000_000;
+const DAY: u64 = 24 * HOUR;
+const T0: u64 = 1_793_500_000 * 1_000_000_000; // 2026-11-01 02:26:40 UTC
+/// 2026-11-01 23:30 UTC, half an hour before the UTC day boundary.
+const LATE: u64 = (T0 / DAY) * DAY + 23 * HOUR + 30 * 60 * 1_000_000_000;
 
 fn acc(s: &str) -> AccountId {
     s.parse().unwrap()
@@ -95,11 +98,26 @@ fn setup() -> Guard {
 }
 
 fn send_near(g: &mut Guard, key: &str, to: &str, amount: U128) -> Option<GuardResult> {
-    as_agent(key, T0);
+    send_near_at(g, key, to, amount, T0)
+}
+
+fn send_near_at(g: &mut Guard, key: &str, to: &str, amount: U128, ts: u64) -> Option<GuardResult> {
+    as_agent(key, ts);
     match g.agent_transfer_near(acc(to), amount, None) {
         PromiseOrValue::Value(r) => Some(r),
         PromiseOrValue::Promise(_) => None, // executed (promise scheduled)
     }
+}
+
+/// The NEAR limit view of `key` as seen at `ts`.
+fn near_view_at(g: &Guard, key: &str, ts: u64) -> AssetLimitView {
+    as_account("anyone.testnet", ts);
+    g.get_agent(pk(key))
+        .unwrap()
+        .limits
+        .into_iter()
+        .find(|l| l.asset == "near")
+        .unwrap()
 }
 
 #[test]
@@ -185,21 +203,123 @@ fn over_per_tx_cap_is_blocked_and_recorded() {
 }
 
 #[test]
-fn daily_cap_accumulates_and_resets_next_day() {
+fn daily_cap_accumulates_within_the_window() {
     let mut g = setup();
     assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(2)).is_none());
     assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(2)).is_none());
     let r = send_near(&mut g, AGENT_A, "alice.testnet", near(2)).unwrap();
     assert_eq!(r.code, "OVER_DAILY_CAP");
-    assert!(r.reason.contains("spent today"), "{}", r.reason);
-    // 1 NEAR still fits today.
+    assert_eq!(
+        r.reason,
+        "2 NEAR + 4 NEAR spent in the last 24h exceeds the daily cap of 5 NEAR"
+    );
+    // 1 NEAR still fits.
     assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(1)).is_none());
-    // Next UTC day the budget is fresh.
-    as_agent(AGENT_A, T0 + DAY);
-    assert!(matches!(
-        g.agent_transfer_near(acc("alice.testnet"), near(2), None),
-        PromiseOrValue::Promise(_)
-    ));
+    let v = near_view_at(&g, AGENT_A, T0);
+    assert_eq!(v.spent_today, near(5));
+    assert_eq!(v.remaining_today, near(0));
+}
+
+#[test]
+fn window_does_not_reset_at_utc_midnight() {
+    // The bug being fixed: with a UTC-day cap, 4 NEAR at 23:30 plus 4 more at 00:30 both passed.
+    let mut g = setup();
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), LATE).is_none());
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), LATE).is_none());
+    let after_midnight = LATE + HOUR;
+    assert_ne!(
+        after_midnight / DAY,
+        LATE / DAY,
+        "must cross a UTC day boundary"
+    );
+    let r = send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), after_midnight).unwrap();
+    assert_eq!(r.code, "OVER_DAILY_CAP");
+    assert!(r.reason.contains("spent in the last 24h"), "{}", r.reason);
+    let v = near_view_at(&g, AGENT_A, after_midnight);
+    assert_eq!(v.spent_today, near(4));
+    assert_eq!(v.remaining_today, near(1));
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(1), after_midnight).is_none());
+}
+
+#[test]
+fn budget_is_fresh_after_25_hours() {
+    let mut g = setup();
+    for amt in [2, 2, 1] {
+        assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(amt), LATE).is_none());
+    }
+    // Still counted 24h later (each spend counts for 24h to 25h)...
+    let r = send_near_at(&mut g, AGENT_A, "alice.testnet", near(1), LATE + DAY).unwrap();
+    assert_eq!(r.code, "OVER_DAILY_CAP");
+    let v = near_view_at(&g, AGENT_A, LATE + DAY);
+    assert_eq!(v.spent_today, near(5));
+    let frees_at = (LATE / HOUR + 25) * HOUR;
+    assert_eq!(v.next_release_at, Some(U64(frees_at)));
+    assert!(frees_at > LATE + DAY && frees_at <= LATE + 25 * HOUR);
+    // ...and gone once the bucket expires.
+    let v = near_view_at(&g, AGENT_A, frees_at);
+    assert_eq!(v.spent_today, U128(0));
+    assert_eq!(v.next_release_at, None);
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), LATE + 25 * HOUR).is_none());
+    let v = near_view_at(&g, AGENT_A, LATE + 25 * HOUR);
+    assert_eq!(v.spent_today, near(2));
+}
+
+#[test]
+fn spends_expire_individually() {
+    let mut g = setup();
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), T0).is_none());
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), T0 + 12 * HOUR).is_none());
+    let v = near_view_at(&g, AGENT_A, T0 + 12 * HOUR);
+    assert_eq!(v.spent_today, near(4));
+    assert_eq!(v.next_release_at, Some(U64((T0 / HOUR + 25) * HOUR)));
+    // At T+25h only the second spend counts.
+    let at = T0 + 25 * HOUR;
+    let v = near_view_at(&g, AGENT_A, at);
+    assert_eq!(v.spent_today, near(2));
+    assert_eq!(v.remaining_today, near(3));
+    assert_eq!(
+        v.next_release_at,
+        Some(U64(((T0 + 12 * HOUR) / HOUR + 25) * HOUR))
+    );
+    // 3 NEAR fits (2 + 1), a further 1 does not.
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), at).is_none());
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(1), at).is_none());
+    let r = send_near_at(&mut g, AGENT_A, "alice.testnet", near(1), at).unwrap();
+    assert_eq!(r.code, "OVER_DAILY_CAP");
+    // The expired bucket was pruned on write.
+    let buckets = &g.agents.get(AGENT_A).unwrap().spent["near"];
+    assert_eq!(
+        buckets,
+        &vec![((T0 + 12 * HOUR) / HOUR, near(2).0), (at / HOUR, near(3).0)]
+    );
+}
+
+#[test]
+fn bucket_count_stays_bounded() {
+    as_owner(T0);
+    let mut g = Guard::new(owner(), None);
+    let _ = g.add_agent(pk(AGENT_A), "a".into(), limits_near(1, 100), None);
+    // One spend every 20 minutes for 100 hours.
+    for i in 0..300u64 {
+        let ts = T0 + i * HOUR / 3;
+        assert!(
+            send_near_at(&mut g, AGENT_A, "alice.testnet", U128(1), ts).is_none(),
+            "spend {i}"
+        );
+        let buckets = &g.agents.get(AGENT_A).unwrap().spent["near"];
+        assert!(buckets.len() <= 25, "{} buckets at {i}", buckets.len());
+        // Same-hour spends are merged; buckets are strictly increasing in hour.
+        assert!(buckets.windows(2).all(|w| w[0].0 < w[1].0));
+    }
+    let last = T0 + 299 * HOUR / 3;
+    let buckets = &g.agents.get(AGENT_A).unwrap().spent["near"];
+    assert_eq!(buckets.len(), 25);
+    let v = near_view_at(&g, AGENT_A, last);
+    assert_eq!(
+        v.spent_today.0,
+        buckets.iter().map(|(_, a)| a).sum::<u128>()
+    );
+    assert!(v.spent_today.0 >= 72 && v.spent_today.0 <= 75);
 }
 
 #[test]
@@ -542,24 +662,97 @@ fn pending_requests_are_bounded_and_rejectable() {
 fn failed_transfer_refunds_daily_budget() {
     let mut g = setup();
     assert!(send_near(&mut g, AGENT_A, "ghost.testnet", near(2)).is_none());
+    // The callback carries the hour bucket the spend was recorded in.
+    let callback_args: Vec<near_sdk::serde_json::Value> =
+        near_sdk::test_utils::get_created_receipts()
+            .into_iter()
+            .flat_map(|r| r.actions)
+            .filter_map(|a| match a {
+                near_sdk::mock::MockAction::FunctionCallWeight {
+                    method_name, args, ..
+                } if method_name == b"on_transfer_settled" => {
+                    near_sdk::serde_json::from_slice(&args).ok()
+                }
+                _ => None,
+            })
+            .collect();
+    assert_eq!(callback_args.len(), 1);
+    assert_eq!(callback_args[0]["hour"], (T0 / HOUR).to_string());
+    assert!(callback_args[0].get("day").is_none());
     as_callback(T0, PromiseResult::Failed);
     let r = g.on_transfer_settled(
         AGENT_A.into(),
         "near".into(),
         acc("ghost.testnet"),
         near(2),
-        U64(T0 / DAY),
+        U64(T0 / HOUR),
         true,
     );
     assert_eq!(r.status, "failed");
-    let l = g
-        .get_agent(pk(AGENT_A))
-        .unwrap()
-        .limits
-        .into_iter()
-        .find(|l| l.asset == "near")
-        .unwrap();
-    assert_eq!(l.spent_today, U128(0));
+    assert_eq!(near_view_at(&g, AGENT_A, T0).spent_today, U128(0));
+    assert!(!g.agents.get(AGENT_A).unwrap().spent.contains_key("near"));
+}
+
+#[test]
+fn refund_hits_only_the_matching_hour_bucket() {
+    let mut g = setup();
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), LATE).is_none());
+    assert!(send_near_at(&mut g, AGENT_A, "ghost.testnet", near(2), LATE + HOUR).is_none());
+    // The failure callback lands in a later block (and a later hour): the right bucket is refunded.
+    as_callback(LATE + 2 * HOUR, PromiseResult::Failed);
+    let r = g.on_transfer_settled(
+        AGENT_A.into(),
+        "near".into(),
+        acc("ghost.testnet"),
+        near(2),
+        U64((LATE + HOUR) / HOUR),
+        true,
+    );
+    assert_eq!(r.status, "failed");
+    assert_eq!(
+        g.agents.get(AGENT_A).unwrap().spent["near"],
+        vec![(LATE / HOUR, near(2).0)]
+    );
+    // A refund for an hour with no bucket changes nothing; refunds never underflow.
+    as_callback(LATE + 2 * HOUR, PromiseResult::Failed);
+    let _ = g.on_transfer_settled(
+        AGENT_A.into(),
+        "near".into(),
+        acc("ghost.testnet"),
+        near(2),
+        U64(LATE / HOUR - 1),
+        true,
+    );
+    as_callback(LATE + 2 * HOUR, PromiseResult::Failed);
+    let _ = g.on_transfer_settled(
+        AGENT_A.into(),
+        "near".into(),
+        acc("ghost.testnet"),
+        near(9),
+        U64(LATE / HOUR),
+        true,
+    );
+    assert_eq!(
+        near_view_at(&g, AGENT_A, LATE + 2 * HOUR).spent_today,
+        U128(0)
+    );
+}
+
+#[test]
+fn uncounted_failure_is_not_refunded() {
+    // Owner-approved transfers (`counted = false`) never touched the agent's budget.
+    let mut g = setup();
+    assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(2)).is_none());
+    as_callback(T0, PromiseResult::Failed);
+    let _ = g.on_transfer_settled(
+        AGENT_A.into(),
+        "near".into(),
+        acc("ghost.testnet"),
+        near(2),
+        U64(T0 / HOUR),
+        false,
+    );
+    assert_eq!(near_view_at(&g, AGENT_A, T0).spent_today, near(2));
 }
 
 #[test]
@@ -572,7 +765,7 @@ fn successful_settlement_counts_execution() {
         "near".into(),
         acc("alice.testnet"),
         near(1),
-        U64(T0 / DAY),
+        U64(T0 / HOUR),
         true,
     );
     assert_eq!(r.status, "executed");

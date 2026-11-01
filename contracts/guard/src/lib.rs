@@ -7,7 +7,7 @@
 //! transfer action, the only way for an agent to move funds is through this
 //! contract, which enforces:
 //!
-//! * per-agent, per-asset caps (per transaction and per UTC day),
+//! * per-agent, per-asset caps (per transaction and per rolling 24-hour window),
 //! * recipient and token allowlists / denylists (with evidence for deny entries),
 //! * a global pause switch,
 //! * human approval for anything over the caps (`agent_request_approval`).
@@ -27,7 +27,13 @@ use near_sdk::{
 
 /// Asset id used for native NEAR. Any other asset id is a NEP-141 token contract.
 pub const NEAR_ASSET: &str = "near";
-const NS_PER_DAY: u64 = 86_400 * 1_000_000_000;
+const NS_PER_HOUR: u64 = 3_600 * 1_000_000_000;
+/// A spend recorded in hour bucket `h` counts while `now_hour - h <= WINDOW_HOURS`.
+/// Because a spend can land anywhere inside its hour, it counts for between 24h
+/// and 25h after it was made, never less: the total spent in any 24-hour interval
+/// is at most `per_day` (conservative), at the cost of budget freeing up to one
+/// hour later than a perfectly exact sliding window would.
+const WINDOW_HOURS: u64 = 24;
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 const GAS_SETTLE_CALLBACK: Gas = Gas::from_tgas(10);
 /// Methods an agent key may call. Everything else needs the owner account.
@@ -73,6 +79,7 @@ pub enum ListKind {
 #[derive(Clone, Debug, PartialEq)]
 pub struct AssetLimit {
     pub per_tx: U128,
+    /// Cap on the total spent in any rolling 24-hour window (not per calendar day).
     pub per_day: U128,
 }
 
@@ -91,8 +98,10 @@ pub struct Agent {
     pub name: String,
     pub enabled: bool,
     pub limits: BTreeMap<String, AssetLimit>,
-    /// asset -> (UTC day index, amount spent that day)
-    pub spent: BTreeMap<String, (u64, u128)>,
+    /// asset -> hourly spend buckets `(hour index = ts / NS_PER_HOUR, amount)`, oldest
+    /// first. Same-hour spends share one bucket and expired buckets are pruned on every
+    /// write, so each asset holds at most `WINDOW_HOURS + 1` (25) buckets.
+    pub spent: BTreeMap<String, Vec<(u64, u128)>>,
     pub pending: u32,
     pub executed: u64,
     pub blocked: u64,
@@ -141,8 +150,13 @@ pub struct AssetLimitView {
     pub asset: String,
     pub per_tx: U128,
     pub per_day: U128,
+    /// Spent in the rolling 24-hour window (the name is kept for client compatibility).
     pub spent_today: U128,
+    /// `per_day - spent_today`: what can still be spent right now.
     pub remaining_today: U128,
+    /// When (ns timestamp) the oldest spend still counted leaves the window and its
+    /// budget frees up; `null` if nothing is counted.
+    pub next_release_at: Option<U64>,
 }
 
 #[near(serializers = [json])]
@@ -303,8 +317,26 @@ pub struct Guard {
     min_balance_reserve: u128,
 }
 
-fn day_index(ts: u64) -> u64 {
-    ts / NS_PER_DAY
+fn hour_index(ts: u64) -> u64 {
+    ts / NS_PER_HOUR
+}
+
+/// `true` while a bucket from `bucket_hour` still counts against the window at `now_hour`.
+fn bucket_live(bucket_hour: u64, now_hour: u64) -> bool {
+    now_hour.saturating_sub(bucket_hour) <= WINDOW_HOURS
+}
+
+/// Sum of the buckets that still count at `now_hour`.
+fn window_total(buckets: &[(u64, u128)], now_hour: u64) -> u128 {
+    buckets
+        .iter()
+        .filter(|(h, _)| bucket_live(*h, now_hour))
+        .fold(0u128, |acc, (_, amt)| acc.saturating_add(*amt))
+}
+
+/// Drop buckets that no longer count (and empty ones).
+fn prune(buckets: &mut Vec<(u64, u128)>, now_hour: u64) {
+    buckets.retain(|(h, amt)| *amt > 0 && bucket_live(*h, now_hour));
 }
 
 fn check_text(s: &str, what: &str) {
@@ -470,7 +502,8 @@ impl Guard {
     // Callback
     // ------------------------------------------------------------------
 
-    /// Settles a transfer started by this contract. On failure the day's spend is refunded.
+    /// Settles a transfer started by this contract. On failure the spend is refunded
+    /// from the hour bucket it was recorded in (`hour`, see `NS_PER_HOUR`).
     #[private]
     pub fn on_transfer_settled(
         &mut self,
@@ -478,18 +511,22 @@ impl Guard {
         asset: String,
         receiver_id: AccountId,
         amount: U128,
-        day: U64,
+        hour: U64,
         counted: bool,
     ) -> GuardResult {
         let success = near_sdk::is_promise_success();
+        let now_hour = hour_index(env::block_timestamp());
         if let Some(agent) = self.agents.get_mut(&agent_key) {
             if success {
                 agent.executed += 1;
-            } else if counted
-                && let Some((d, spent)) = agent.spent.get_mut(&asset)
-                && *d == day.0
-            {
-                *spent = spent.saturating_sub(amount.0);
+            } else if counted && let Some(buckets) = agent.spent.get_mut(&asset) {
+                if let Some((_, spent)) = buckets.iter_mut().find(|(h, _)| *h == hour.0) {
+                    *spent = spent.saturating_sub(amount.0);
+                }
+                prune(buckets, now_hour);
+                if buckets.is_empty() {
+                    agent.spent.remove(&asset);
+                }
             }
         }
         GuardEvent::TransferSettled {
@@ -511,7 +548,7 @@ impl Guard {
             GuardResult {
                 status: "failed".into(),
                 code: "TRANSFER_FAILED".into(),
-                reason: "the transfer receipt failed; the daily budget was refunded".into(),
+                reason: "the transfer receipt failed; the 24h budget was refunded".into(),
                 request_id: None,
             }
         }
@@ -602,7 +639,7 @@ impl Guard {
         .emit();
     }
 
-    /// Replace an agent's limits. Today's spend is kept.
+    /// Replace an agent's limits. Spend in the rolling 24h window is kept.
     #[payable]
     pub fn set_agent_limits(&mut self, public_key: PublicKey, limits: Vec<AssetLimitInput>) {
         self.assert_owner();
@@ -1054,11 +1091,13 @@ impl Guard {
         None
     }
 
-    fn spent_today(agent: &Agent, asset: &str, today: u64) -> u128 {
-        match agent.spent.get(asset) {
-            Some((d, amt)) if *d == today => *amt,
-            _ => 0,
-        }
+    /// Amount of `asset` spent in the rolling 24h window ending at `now_hour`.
+    fn spent_in_window(agent: &Agent, asset: &str, now_hour: u64) -> u128 {
+        agent
+            .spent
+            .get(asset)
+            .map(|b| window_total(b, now_hour))
+            .unwrap_or(0)
     }
 
     fn spendable_near(&self) -> u128 {
@@ -1120,8 +1159,8 @@ impl Guard {
         if amount > limit.per_tx.0 {
             return Err(Block::OverTxCap);
         }
-        let today = day_index(env::block_timestamp());
-        let spent = Self::spent_today(agent, asset, today);
+        let now_hour = hour_index(env::block_timestamp());
+        let spent = Self::spent_in_window(agent, asset, now_hour);
         if spent.saturating_add(amount) > limit.per_day.0 {
             return Err(Block::OverDailyCap);
         }
@@ -1139,7 +1178,7 @@ impl Guard {
         receiver: &AccountId,
         amount: u128,
     ) -> String {
-        let today = day_index(env::block_timestamp());
+        let now_hour = hour_index(env::block_timestamp());
         let agent = self.agents.get(key);
         let limit = agent.and_then(|a| a.limits.get(asset));
         match b {
@@ -1168,10 +1207,10 @@ impl Guard {
             ),
             Block::OverDailyCap => {
                 let spent = agent
-                    .map(|a| Self::spent_today(a, asset, today))
+                    .map(|a| Self::spent_in_window(a, asset, now_hour))
                     .unwrap_or(0);
                 format!(
-                    "{} + {} spent today exceeds the daily cap of {}",
+                    "{} + {} spent in the last 24h exceeds the daily cap of {}",
                     fmt_amount(asset, amount),
                     fmt_amount(asset, spent),
                     fmt_amount(asset, limit.map(|l| l.per_day.0).unwrap_or(0))
@@ -1226,13 +1265,14 @@ impl Guard {
         if let Err(b) = self.evaluate(&key, &asset, &receiver_id, amount.0) {
             return PromiseOrValue::Value(self.record_block(&key, &asset, &receiver_id, amount, b));
         }
-        let today = day_index(env::block_timestamp());
+        let now_hour = hour_index(env::block_timestamp());
         let agent = self.agents.get_mut(&key).expect("checked by evaluate");
-        let entry = agent.spent.entry(asset.clone()).or_insert((today, 0));
-        if entry.0 != today {
-            *entry = (today, 0);
+        let buckets = agent.spent.entry(asset.clone()).or_default();
+        prune(buckets, now_hour);
+        match buckets.last_mut() {
+            Some((h, amt)) if *h == now_hour => *amt += amount.0,
+            _ => buckets.push((now_hour, amount.0)),
         }
-        entry.1 += amount.0;
         GuardEvent::TransferAllowed {
             agent: key.clone(),
             asset: asset.clone(),
@@ -1252,7 +1292,7 @@ impl Guard {
         memo: Option<String>,
         counted: bool,
     ) -> Promise {
-        let day = U64(day_index(env::block_timestamp()));
+        let hour = U64(hour_index(env::block_timestamp()));
         let transfer = if asset == NEAR_ASSET {
             Promise::new(receiver_id.clone()).transfer(NearToken::from_yoctonear(amount.0))
         } else {
@@ -1272,12 +1312,12 @@ impl Guard {
         transfer.then(
             Self::ext(env::current_account_id())
                 .with_static_gas(GAS_SETTLE_CALLBACK)
-                .on_transfer_settled(key, asset, receiver_id, amount, day, counted),
+                .on_transfer_settled(key, asset, receiver_id, amount, hour, counted),
         )
     }
 
     fn agent_view(&self, key: &str, a: &Agent) -> AgentView {
-        let today = day_index(env::block_timestamp());
+        let now_hour = hour_index(env::block_timestamp());
         AgentView {
             public_key: key.to_string(),
             name: a.name.clone(),
@@ -1286,13 +1326,21 @@ impl Guard {
                 .limits
                 .iter()
                 .map(|(asset, l)| {
-                    let spent = Self::spent_today(a, asset, today);
+                    let spent = Self::spent_in_window(a, asset, now_hour);
+                    let oldest = a.spent.get(asset).and_then(|b| {
+                        b.iter()
+                            .filter(|(h, amt)| *amt > 0 && bucket_live(*h, now_hour))
+                            .map(|(h, _)| *h)
+                            .min()
+                    });
                     AssetLimitView {
                         asset: asset.clone(),
                         per_tx: l.per_tx,
                         per_day: l.per_day,
                         spent_today: U128(spent),
                         remaining_today: U128(l.per_day.0.saturating_sub(spent)),
+                        next_release_at: oldest
+                            .map(|h| U64((h + WINDOW_HOURS + 1).saturating_mul(NS_PER_HOUR))),
                     }
                 })
                 .collect(),
