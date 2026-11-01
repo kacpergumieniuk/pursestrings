@@ -111,7 +111,7 @@ export async function runDemo(s: DemoState, opts: DemoOptions = {}): Promise<Wal
   const pending = await guard.listPending();
   console.log(`\n${bold("on-chain state of the vault")}`);
   const near = agentView?.limits.find((l) => l.asset === "near");
-  if (near) console.log(`  agent spent today ${fmtAmount(near.spent_today, 24)} NEAR, remaining ${fmtAmount(near.remaining_today, 24)} NEAR`);
+  if (near) console.log(`  agent spent in the last 24h ${fmtAmount(near.spent_today, 24)} NEAR, remaining ${fmtAmount(near.remaining_today, 24)} NEAR`);
   console.log(`  executed ${agentView?.executed ?? 0}, blocked attempts recorded on chain ${agentView?.blocked ?? 0}, pending approvals ${pending.length}`);
   for (const p of pending) {
     const amt = p.asset === "near" ? `${fmtAmount(String(p.amount), 24)} NEAR` : `${String(p.amount)} units of ${String(p.asset)}`;
