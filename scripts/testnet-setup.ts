@@ -5,13 +5,14 @@
  *
  *   npm run testnet:setup            # creates a new environment if none exists
  *   npm run testnet:setup -- --force # creates a fresh one
- *   npm run testnet:setup -- --redeploy # upgrades the Guard code on the existing vault (state is kept)
+ *   npm run testnet:setup -- --redeploy # upgrades the Guard code on the existing vault and runs
+ *                                       # migrate_spend_windows in the same transaction (state is kept)
  */
 import "../src/demo/env";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { Account, JsonRpcProvider } from "near-api-js";
-import { explorerAccount } from "../src/near/guard-client";
+import { Account, actions, getTransactionLastResult, JsonRpcProvider, teraToGas } from "near-api-js";
+import { explorerAccount, explorerTx } from "../src/near/guard-client";
 import { loadState, ROOT, saveState, setupDemo, statePath, TESTNET_RPC, testnetFactory } from "../src/demo/setup";
 
 const rpcUrl = process.env.GUARD_TESTNET_RPC ?? TESTNET_RPC;
@@ -25,8 +26,16 @@ const existing = loadState("testnet");
 if (existing && process.argv.includes("--redeploy")) {
   const wasm = new Uint8Array(readFileSync(join(ROOT, "contracts/target/near/near_guard/near_guard.wasm")));
   const vault = new Account(existing.vault.id, new JsonRpcProvider({ url: rpcUrl }), existing.vault.key);
-  const r = await vault.deployContract(wasm);
-  console.log(`redeployed Guard to ${existing.vault.id}: ${explorerAccount("testnet", existing.vault.id)} (tx ${(r as { transaction: { hash: string } }).transaction.hash})`);
+  // Deploy and migrate in ONE transaction: both actions succeed or neither does, and no agent call
+  // can run between them. `migrate_spend_windows` is a no-op (returns 0) on an already-migrated vault.
+  const r = await vault.signAndSendTransaction({
+    receiverId: existing.vault.id,
+    actions: [actions.deployContract(wasm), actions.functionCall("migrate_spend_windows", {}, teraToGas("100"), 0n)],
+    waitUntil: "FINAL",
+  });
+  const migrated = getTransactionLastResult(r);
+  console.log(`redeployed Guard to ${existing.vault.id} and migrated ${String(migrated)} agent(s): ${explorerAccount("testnet", existing.vault.id)}`);
+  console.log(`  tx ${explorerTx("testnet", (r as { transaction: { hash: string } }).transaction.hash)}`);
   process.exit(0);
 }
 if (existing && !process.argv.includes("--force")) {
