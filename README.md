@@ -287,6 +287,10 @@ tells the same story. `npm run demo:record` records it into [`docs/video/`](docs
 plain transcript, and `viewer.html`, a self-contained player with the terminal on the left and the Telegram chat on a phone on
 the right. Screenshots of each scene are in [`docs/video/shots/`](docs/video/shots).
 
+**The demo video:** [`docs/video/guard-demo.mp4`](docs/video/guard-demo.mp4) (2:17, 1080p, English voice-over and subtitles,
+[`guard-demo.en.srt`](docs/video/guard-demo.en.srt)). It is this recording rendered frame by frame, on a local NEAR sandbox node,
+with the Telegram bot in console mode. The voice is synthetic (macOS `say`).
+
 ## Tests
 
 | Suite | Command | What it covers |

@@ -13,9 +13,9 @@ Steps marked **Owner** are ones the agent must not do (rules: "Never without the
 | 2 | Create the GitHub repo (e.g. `github.com/<you>/near-guard`) and push this repository. It may stay private while building. | **Owner** (or the agent after an explicit OK) | ☐ |
 | 3 | Final code freeze. Tag it: `git tag hackathon-submission && git push --tags` (Q-003). There is no `pre-hackathon` tag because all code was written in the window. | Owner / agent | ☐ |
 | 3b | Optional: create a Telegram bot with @BotFather, put `TELEGRAM_BOT_TOKEN` and your numeric user id (`TELEGRAM_OWNER_IDS`, from `/whoami`) in `.env`, run `npm run bot`, and try `/check` and `/pending`. The agent must not create the bot for you. | **Owner** | ☐ |
-| 4 | Record the demo video (script below). Local demo is allowed (Q-012), but a video is required because judges cannot run your machine. | **Owner** (agent can script and capture) | ☐ |
+| 4 | ~~Record the demo video.~~ **Done by the agent:** [`docs/video/guard-demo.mp4`](video/guard-demo.mp4) (2:17, English voice-over, subtitles; see [Demo video](#demo-video-ready)). Owner: **watch it once** and say OK or what to change. Local demo is allowed (Q-012), but a video is required because judges cannot run your machine. | Agent made it; **Owner** reviews | ☐ |
 | 5 | **Make the repo public** before 2026-11-14T23:59Z. Keep it public through judging (Q-014). | **Owner** | ☐ |
-| 6 | Publish the X demo post from your account (draft below). Must say it was built at NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, and attach the video. | **Owner** | ☐ |
+| 6 | Publish the X demo post from your account (draft below). Must say it was built at NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, and attach the video (`docs/video/guard-demo.mp4`, upload it directly to X). | **Owner** | ☐ |
 | 7 | Fill in the fields below, check the printed JSON payload, then send it via https://nearhackathon.com/#apply or the API. | **Owner** confirms; then send | ☐ |
 | 8 | If you also submit a second project (max 2 per person, Q-015), **name the other project in both READMEs**. | Owner | ☐ |
 | 9 | Keep the testnet vault and (optional) hosted demo up until at least 2026-11-18, ideally 2026-11-25. Answer judge questions in Discord. | Owner | ☐ |
@@ -68,6 +68,38 @@ Check the length before sending: `node -e 'console.log(process.argv[1].length)' 
 
 Responses: 201 saved · 400 fix the listed `fields`, resend with the same `requestId` · 403 window closed or cross-site; do not retry · 409 repo already submitted or email limit reached; ask, do not work around it · 413 shorten `idea` · 503 wait a minute, resend with the same `requestId`.
 Do not commit the filled payload; it contains personal data.
+
+## Demo video (ready)
+
+**File:** [`docs/video/guard-demo.mp4`](video/guard-demo.mp4): 2:17 (136.8 s), 1920x1080, 30 fps, H.264 High + AAC 160 kb/s stereo,
+19.9 MB, about -16 LUFS. Committed to git as a normal file (under 50 MB, no LFS). Subtitles are burned into the picture, and the same
+text is also a soft English track inside the mp4 and a separate file, [`docs/video/guard-demo.en.srt`](video/guard-demo.en.srt).
+
+**What it is:** the committed recording (`guard-demo.cast`) played in `viewer.html?clean=1` (terminal on the left, the Telegram
+chat on a phone on the right), with an English voice-over and a 3.5 s end card (repo URL, "Built at NEAR HACKATHON 2026 · security
+track", and what is real). The narration follows the script below, shortened so it fits **under 2:20**. That is X's upload limit for
+accounts without Premium, and the rules say the video goes on the X post. The voice says the demo runs on a **local NEAR node**,
+that the Telegram chat is the bot in **console mode**, and that the contract is also deployed on **NEAR testnet**. It never claims
+mainnet use or real users. The end card adds that the mainnet lookups and the 1Click quote are recordings from 2026-11-01.
+
+**How it was made:** every frame was rendered by seeking the viewer (`window.__guardViewer.seek`) in headless Chromium through
+Playwright, piped to ffmpeg. The voice is macOS `say -v Samantha` (synthetic, the most natural en_US voice on this Mac), one clip per
+subtitle line. The cast is held or sped up between lines so each line starts when its event appears on screen. Checked: speech
+onsets in the final file are within 10 ms of the subtitle cues; frames at 10 timestamps were inspected (each shows the event being
+narrated); the file decodes with no errors.
+
+**Rules check (HACKATHON.md, read 2026-11-01):** no required length, format or host, and nothing says the narration must be a
+human voice. The video is attached to the owner's public X post (step 6). The rules do say "the human records a demo and
+publishes a public post", so the owner should at least watch it and post it themselves. If you would rather narrate it yourself,
+make a silent copy that keeps the burned-in subtitles and record over it:
+`ffmpeg -i docs/video/guard-demo.mp4 -map 0:v -c copy docs/video/guard-demo-silent.mp4`.
+
+**What the owner still has to do:**
+1. Watch `docs/video/guard-demo.mp4` once (QuickTime). Say OK or what to change; the agent can re-render in about a minute.
+2. Upload it **directly in the X post** (step 6). It fits X's 2:20 / 512 MB limits, so no Premium is needed.
+3. Optional: also upload it to YouTube as **Unlisted** and send the agent the link, to put in the README. Not required by the rules.
+
+Nothing has been uploaded or published.
 
 ## Demo video script (about 2:20)
 
