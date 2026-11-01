@@ -34,6 +34,9 @@ const NS_PER_HOUR: u64 = 3_600 * 1_000_000_000;
 /// is at most `per_day` (conservative), at the cost of budget freeing up to one
 /// hour later than a perfectly exact sliding window would.
 const WINDOW_HOURS: u64 = 24;
+/// Raw storage key (outside the `Guard` root struct) set once `Agent.spent` uses hourly
+/// buckets: by `new`, or by `migrate_spend_windows` on a vault created by older code.
+const SPEND_LAYOUT_KEY: &[u8] = b"spend_layout_v2";
 const GAS_FT_TRANSFER: Gas = Gas::from_tgas(15);
 const GAS_SETTLE_CALLBACK: Gas = Gas::from_tgas(10);
 /// Methods an agent key may call. Everything else needs the owner account.
@@ -106,6 +109,53 @@ pub struct Agent {
     pub executed: u64,
     pub blocked: u64,
     pub created_at: u64,
+}
+
+/// `Agent` as stored by the UTC-day code (up to commit 7c32380). Only read by
+/// `migrate_spend_windows`.
+#[near(serializers = [borsh])]
+#[derive(Clone, Debug)]
+struct AgentV1 {
+    name: String,
+    enabled: bool,
+    limits: BTreeMap<String, AssetLimit>,
+    /// asset -> (UTC day index, amount spent that day)
+    spent: BTreeMap<String, (u64, u128)>,
+    pending: u32,
+    executed: u64,
+    blocked: u64,
+    created_at: u64,
+}
+
+impl AgentV1 {
+    /// Each `(day, amount)` becomes one bucket at hour `min(last hour of day, now_hour)`.
+    ///
+    /// The old entry does not say when during the day the spend happened, so it is placed
+    /// at the latest moment it could have happened (but not in the future). That keeps it
+    /// counted at least until the end of `day` (as long as the old code counted it) and at
+    /// least 24h after any actual spend in it. A spend from yesterday can therefore count
+    /// into today, which the old code did not do: stricter, never looser. Entries already
+    /// outside the window are dropped.
+    fn into_current(self, now_hour: u64) -> Agent {
+        let spent = self
+            .spent
+            .into_iter()
+            .filter_map(|(asset, (day, amount))| {
+                let hour = day.saturating_mul(24).saturating_add(23).min(now_hour);
+                (amount > 0 && bucket_live(hour, now_hour)).then(|| (asset, vec![(hour, amount)]))
+            })
+            .collect();
+        Agent {
+            name: self.name,
+            enabled: self.enabled,
+            limits: self.limits,
+            spent,
+            pending: self.pending,
+            executed: self.executed,
+            blocked: self.blocked,
+            created_at: self.created_at,
+        }
+    }
 }
 
 #[near(serializers = [borsh, json])]
@@ -377,6 +427,7 @@ fn is_same_or_sub(account: &AccountId, listed: &AccountId) -> bool {
 impl Guard {
     #[init]
     pub fn new(owner_id: AccountId, min_balance_reserve: Option<U128>) -> Self {
+        env::storage_write(SPEND_LAYOUT_KEY, b"2");
         Self {
             owner_id,
             paused: false,
@@ -552,6 +603,50 @@ impl Guard {
                 request_id: None,
             }
         }
+    }
+
+    // ------------------------------------------------------------------
+    // Upgrade
+    // ------------------------------------------------------------------
+
+    /// Converts agents stored by the UTC-day code (spent = `(day, amount)` per asset) to
+    /// hourly buckets (see `AgentV1::into_current`). Returns the number of agents converted.
+    ///
+    /// Call it from the vault account in the same transaction as the code upgrade
+    /// (`DeployContract` + `FunctionCall migrate_spend_windows`), so no agent call ever
+    /// runs against the old layout. The root `Guard` struct is unchanged, so no state
+    /// rewrite is needed. Idempotent: once converted (or on a vault created by this code)
+    /// it does nothing and returns 0. Until it runs, upgraded code cannot decode agents
+    /// with recorded spends (agent calls and views on them panic: fail closed); if an agent
+    /// recorded a new-layout spend in that gap, this call panics and changes nothing.
+    /// Rewrites every agent in one call, which is fine for the handful a vault hosts.
+    #[private]
+    pub fn migrate_spend_windows(&mut self) -> u32 {
+        if env::storage_has_key(SPEND_LAYOUT_KEY) {
+            return 0;
+        }
+        let now_hour = hour_index(env::block_timestamp());
+        // A second handle on the same storage that reads values with the old layout.
+        // `IterableMap`'s borsh form (prefixes + length) does not depend on the value type.
+        let mut old: IterableMap<String, AgentV1> =
+            near_sdk::borsh::from_slice(&near_sdk::borsh::to_vec(&self.agents).unwrap()).unwrap();
+        let agents: Vec<(String, AgentV1)> =
+            old.iter().map(|(k, a)| (k.clone(), a.clone())).collect();
+        // `clear` removes entries without decoding them; dropping the handle flushes that.
+        // A plain `insert` over an old entry would first decode it with the new layout.
+        old.clear();
+        drop(old);
+        self.agents = IterableMap::new(StorageKey::Agents);
+        let count = agents.len() as u32;
+        for (key, agent) in agents {
+            self.agents.insert(key, agent.into_current(now_hour));
+        }
+        env::storage_write(SPEND_LAYOUT_KEY, b"2");
+        GuardEvent::PolicyChanged {
+            change: format!("migrated {count} agents to rolling 24h spend windows"),
+        }
+        .emit();
+        count
     }
 
     // ------------------------------------------------------------------

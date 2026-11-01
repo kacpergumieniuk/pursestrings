@@ -854,3 +854,166 @@ fn ownership_transfer() {
     g.transfer_ownership(acc("dao.testnet"));
     assert_eq!(g.get_policy().owner_id, acc("dao.testnet"));
 }
+
+// ----------------------------------------------------------------------
+// Migration from the UTC-day layout
+// ----------------------------------------------------------------------
+
+fn v1_agent(name: &str, spent: Vec<(&str, u64, u128)>) -> AgentV1 {
+    let mut limits = BTreeMap::new();
+    limits.insert(
+        "near".to_string(),
+        AssetLimit {
+            per_tx: near(2),
+            per_day: near(5),
+        },
+    );
+    limits.insert(
+        usdc().to_string(),
+        AssetLimit {
+            per_tx: U128(100_000_000),
+            per_day: U128(250_000_000),
+        },
+    );
+    AgentV1 {
+        name: name.into(),
+        enabled: true,
+        limits,
+        spent: spent
+            .into_iter()
+            .map(|(a, day, amt)| (a.to_string(), (day, amt)))
+            .collect(),
+        pending: 1,
+        executed: 7,
+        blocked: 3,
+        created_at: T0 - DAY,
+    }
+}
+
+/// A vault as the UTC-day code left it: agents stored with the old layout, no layout marker.
+fn old_vault(agents: Vec<(&str, AgentV1)>) -> Guard {
+    as_owner(T0);
+    let mut g = Guard::new(owner(), None);
+    g.allow(ListKind::Token, vec![usdc()]);
+    let mut old: IterableMap<String, AgentV1> =
+        near_sdk::borsh::from_slice(&near_sdk::borsh::to_vec(&g.agents).unwrap()).unwrap();
+    for (k, a) in agents {
+        old.insert(k.to_string(), a);
+    }
+    old.flush();
+    // The root struct only stores the map's prefix and length.
+    g.agents = near_sdk::borsh::from_slice(&near_sdk::borsh::to_vec(&old).unwrap()).unwrap();
+    drop(old);
+    env::storage_remove(SPEND_LAYOUT_KEY);
+    g
+}
+
+fn as_vault(ts: u64) {
+    let mut b = base_ctx(ts);
+    b.predecessor_account_id(vault()).signer_account_id(vault());
+    testing_env!(b.build());
+}
+
+#[test]
+fn migration_converts_old_spends_conservatively() {
+    let today = LATE / DAY;
+    let mut g = old_vault(vec![
+        (
+            AGENT_A,
+            v1_agent(
+                "treasury-bot",
+                vec![
+                    ("near", today, near(4).0),
+                    (usdc().as_str(), today - 1, 100),
+                ],
+            ),
+        ),
+        (
+            AGENT_B,
+            v1_agent("grants-bot", vec![("near", today - 3, near(5).0)]),
+        ),
+    ]);
+    as_vault(LATE);
+    assert_eq!(g.migrate_spend_windows(), 2);
+    assert!(get_logs().join("").contains("migrated 2 agents"));
+
+    // Order, names and counters survive.
+    as_account("anyone.testnet", LATE);
+    let all = g.list_agents(None, None);
+    assert_eq!(
+        all.iter()
+            .map(|a| a.public_key.as_str())
+            .collect::<Vec<_>>(),
+        vec![AGENT_A, AGENT_B]
+    );
+    let a = &all[0];
+    assert_eq!(
+        (a.name.as_str(), a.pending, a.executed, a.blocked),
+        ("treasury-bot", 1, 7, 3)
+    );
+    assert_eq!(a.created_at, U64(T0 - DAY));
+
+    // Today's spend is placed at the current hour (not in the future)...
+    let v = near_view_at(&g, AGENT_A, LATE);
+    assert_eq!(v.spent_today, near(4));
+    assert_eq!(v.next_release_at, Some(U64((LATE / HOUR + 25) * HOUR)));
+    // ...yesterday's at yesterday's last hour, so it still counts today...
+    let u = &g.agents.get(AGENT_A).unwrap().spent[usdc().as_str()];
+    assert_eq!(u, &vec![(today * 24 - 1, 100)]);
+    // ...and a 3-day-old spend is dropped.
+    assert!(g.agents.get(AGENT_B).unwrap().spent.is_empty());
+    assert_eq!(near_view_at(&g, AGENT_B, LATE).spent_today, U128(0));
+
+    // The old spend keeps counting past UTC midnight (the old code would have reset it).
+    let r = send_near_at(&mut g, AGENT_A, "alice.testnet", near(2), LATE + HOUR).unwrap();
+    assert_eq!(r.code, "OVER_DAILY_CAP");
+    assert!(send_near_at(&mut g, AGENT_A, "alice.testnet", near(1), LATE + HOUR).is_none());
+    // ...for at least 24h, and is gone after its bucket expires.
+    let r = send_near_at(&mut g, AGENT_A, "alice.testnet", near(1), LATE + DAY).unwrap();
+    assert_eq!(r.code, "OVER_DAILY_CAP");
+    let v = near_view_at(&g, AGENT_A, LATE + 25 * HOUR);
+    assert_eq!(v.spent_today, near(1)); // only the 1 NEAR sent at LATE + 1h
+
+    // Running it again is a no-op.
+    as_vault(LATE + 25 * HOUR);
+    assert_eq!(g.migrate_spend_windows(), 0);
+    assert_eq!(
+        near_view_at(&g, AGENT_A, LATE + 25 * HOUR).spent_today,
+        near(1)
+    );
+}
+
+#[test]
+#[should_panic(expected = "Cannot deserialize element")]
+fn old_layout_fails_closed_before_migration() {
+    // Upgraded code without the migration cannot read an agent with recorded spends.
+    let mut g = old_vault(vec![(
+        AGENT_A,
+        v1_agent("treasury-bot", vec![("near", T0 / DAY, near(4).0)]),
+    )]);
+    let _ = send_near(&mut g, AGENT_A, "alice.testnet", near(2));
+}
+
+#[test]
+fn migration_is_a_noop_on_a_new_vault() {
+    let mut g = setup();
+    assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(2)).is_none());
+    as_vault(T0);
+    assert_eq!(g.migrate_spend_windows(), 0);
+    assert_eq!(near_view_at(&g, AGENT_A, T0).spent_today, near(2));
+    assert_eq!(
+        g.agents.get(AGENT_A).unwrap().spent["near"],
+        vec![(T0 / HOUR, near(2).0)]
+    );
+}
+
+#[test]
+fn migration_of_an_empty_old_vault() {
+    let mut g = old_vault(vec![]);
+    as_vault(T0);
+    assert_eq!(g.migrate_spend_windows(), 0);
+    assert!(env::storage_has_key(SPEND_LAYOUT_KEY));
+    as_owner(T0);
+    let _ = g.add_agent(pk(AGENT_A), "a".into(), limits_near(1, 1), None);
+    assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(1)).is_none());
+}
