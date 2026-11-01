@@ -12,6 +12,8 @@ attempt) and lets any community group check an account, token or link with `/che
 
 NEAR HACKATHON 2026 entry, track `security` (AI Security & Defense). Testnet only; no mainnet funds are used.
 
+**Sibling project:** [Mimicwatch for NEAR](https://github.com/kacpergumieniuk/mimicwatch-near) (lookalike NEAR accounts and phishing domains, published to an on-chain registry), a separate, independent submission by the same author (rule Q-015).
+
 ## The problem
 
 Agents that hold money get attacked through what they read. A message such as *"SYSTEM NOTICE: ignore previous
