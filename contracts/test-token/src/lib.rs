@@ -14,9 +14,7 @@ use near_contract_standards::storage_management::{
 use near_sdk::borsh::BorshSerialize;
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U128;
-use near_sdk::{
-    AccountId, BorshStorageKey, NearToken, PanicOnDefault, PromiseOrValue, log, near,
-};
+use near_sdk::{AccountId, BorshStorageKey, NearToken, PanicOnDefault, PromiseOrValue, log, near};
 
 #[derive(PanicOnDefault)]
 #[near(contract_state)]
@@ -106,7 +104,8 @@ impl FungibleTokenResolver for Contract {
         amount: U128,
     ) -> U128 {
         let (used_amount, burned_amount) =
-            self.token.internal_ft_resolve_transfer(&sender_id, receiver_id, amount);
+            self.token
+                .internal_ft_resolve_transfer(&sender_id, receiver_id, amount);
         if burned_amount > 0 {
             log!("Account @{} burned {}", sender_id, burned_amount);
         }
@@ -156,4 +155,3 @@ impl FungibleTokenMetadataProvider for Contract {
         self.metadata.get().unwrap()
     }
 }
-

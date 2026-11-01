@@ -25,7 +25,12 @@ fn build(crate_dir: &str, artifact: &str) -> Vec<u8> {
         .status()
         .expect("`cargo near` must be installed to run sandbox tests");
     assert!(status.success(), "building {crate_dir} failed");
-    std::fs::read(root.join("target/near").join(artifact).join(format!("{artifact}.wasm"))).unwrap()
+    std::fs::read(
+        root.join("target/near")
+            .join(artifact)
+            .join(format!("{artifact}.wasm")),
+    )
+    .unwrap()
 }
 
 struct Env {
@@ -43,7 +48,12 @@ struct Env {
 
 async fn create(sandbox: &near_sandbox::Sandbox, name: &str, near: u128) -> AccountId {
     let id: AccountId = name.parse().unwrap();
-    sandbox.create_account(id.clone()).initial_balance(NearToken::from_near(near)).send().await.unwrap();
+    sandbox
+        .create_account(id.clone())
+        .initial_balance(NearToken::from_near(near))
+        .send()
+        .await
+        .unwrap();
     id
 }
 
@@ -54,7 +64,9 @@ async fn setup() -> Env {
     let sandbox = near_sandbox::Sandbox::start_sandbox().await.unwrap();
     let net = NetworkConfig::from_rpc_url("sandbox", sandbox.rpc_addr.parse().unwrap());
     let genesis = Signer::from_secret_key(
-        near_sandbox::config::DEFAULT_GENESIS_ACCOUNT_PRIVATE_KEY.parse().unwrap(),
+        near_sandbox::config::DEFAULT_GENESIS_ACCOUNT_PRIVATE_KEY
+            .parse()
+            .unwrap(),
     )
     .unwrap();
 
@@ -123,12 +135,38 @@ async fn setup() -> Env {
         }),
     )
     .await;
-    owner_call(&net, &genesis, &owner, &vault, "allow", json!({ "kind": "token", "account_ids": [usdc] })).await;
+    owner_call(
+        &net,
+        &genesis,
+        &owner,
+        &vault,
+        "allow",
+        json!({ "kind": "token", "account_ids": [usdc] }),
+    )
+    .await;
 
-    Env { sandbox, net, genesis, agent, agent_pk, owner, vault, alice, usdc, fake_usdc }
+    Env {
+        sandbox,
+        net,
+        genesis,
+        agent,
+        agent_pk,
+        owner,
+        vault,
+        alice,
+        usdc,
+        fake_usdc,
+    }
 }
 
-async fn owner_call(net: &NetworkConfig, signer: &Arc<Signer>, owner: &AccountId, vault: &AccountId, method: &str, args: Value) {
+async fn owner_call(
+    net: &NetworkConfig,
+    signer: &Arc<Signer>,
+    owner: &AccountId,
+    vault: &AccountId,
+    method: &str,
+    args: Value,
+) {
     // Owner admin methods require exactly 1 yoctoNEAR (proves a full-access key signed).
     // `report` is also open to reporter bots that use function-call keys, so it takes no deposit.
     let deposit = if method == "report" { 0 } else { 1 };
@@ -160,7 +198,13 @@ async fn agent_call(e: &Env, method: &str, args: Value) -> (Value, Vec<String>) 
 }
 
 async fn near_balance(e: &Env, who: &AccountId) -> u128 {
-    Tokens::account(who.clone()).near_balance().fetch_from(&e.net).await.unwrap().total.as_yoctonear()
+    Tokens::account(who.clone())
+        .near_balance()
+        .fetch_from(&e.net)
+        .await
+        .unwrap()
+        .total
+        .as_yoctonear()
 }
 
 async fn ft_balance(e: &Env, token: &AccountId, who: &AccountId) -> u128 {
@@ -175,7 +219,13 @@ async fn ft_balance(e: &Env, token: &AccountId, who: &AccountId) -> u128 {
 }
 
 async fn view(e: &Env, method: &str, args: Value) -> Value {
-    Contract(e.vault.clone()).call_function(method, args).read_only().fetch_from(&e.net).await.unwrap().data
+    Contract(e.vault.clone())
+        .call_function(method, args)
+        .read_only()
+        .fetch_from(&e.net)
+        .await
+        .unwrap()
+        .data
 }
 
 #[tokio::test]
@@ -184,15 +234,26 @@ async fn guard_end_to_end() {
     let one = NearToken::from_near(1).as_yoctonear();
 
     // 0. The vault now holds a function-call key for the agent, scoped to the agent methods.
-    let keys = Account(e.vault.clone()).list_keys().fetch_from(&e.net).await.unwrap();
+    let keys = Account(e.vault.clone())
+        .list_keys()
+        .fetch_from(&e.net)
+        .await
+        .unwrap();
     let keys_dbg = format!("{keys:?}");
-    assert!(keys_dbg.contains(&e.agent_pk), "agent key missing: {keys_dbg}");
+    assert!(
+        keys_dbg.contains(&e.agent_pk),
+        "agent key missing: {keys_dbg}"
+    );
     assert!(keys_dbg.contains("agent_transfer_near"), "{keys_dbg}");
 
     // 1. Normal transfer within caps: executed.
     let before = near_balance(&e, &e.alice).await;
-    let (r, logs) =
-        agent_call(&e, "agent_transfer_near", json!({ "receiver_id": e.alice, "amount": one.to_string() })).await;
+    let (r, logs) = agent_call(
+        &e,
+        "agent_transfer_near",
+        json!({ "receiver_id": e.alice, "amount": one.to_string() }),
+    )
+    .await;
     assert_eq!(r["status"], "executed", "{r}");
     assert!(logs.iter().any(|l| l.contains("transfer_allowed")));
     assert_eq!(near_balance(&e, &e.alice).await, before + one);
@@ -239,7 +300,12 @@ async fn guard_end_to_end() {
     .await;
     assert_eq!(r["status"], "failed", "{r}");
     let agent = view(&e, "get_agent", json!({ "public_key": e.agent_pk })).await;
-    let usdc_limit = agent["limits"].as_array().unwrap().iter().find(|l| l["asset"] == e.usdc.as_str()).unwrap();
+    let usdc_limit = agent["limits"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|l| l["asset"] == e.usdc.as_str())
+        .unwrap();
     assert_eq!(usdc_limit["spent_today"], (50 * USDC).to_string());
 
     // 6. NEAR to a non-existent named account fails and is refunded the same way.
@@ -262,8 +328,12 @@ async fn guard_end_to_end() {
                 "evidence": "https://example.org/report/1" }),
     )
     .await;
-    let (r, _) =
-        agent_call(&e, "agent_transfer_near", json!({ "receiver_id": "bob.sandbox", "amount": "1" })).await;
+    let (r, _) = agent_call(
+        &e,
+        "agent_transfer_near",
+        json!({ "receiver_id": "bob.sandbox", "amount": "1" }),
+    )
+    .await;
     assert_eq!(r["code"], "RECIPIENT_DENYLISTED");
 
     // 8. Over-cap payments can be escalated to the owner, who approves them.
@@ -277,26 +347,53 @@ async fn guard_end_to_end() {
     assert_eq!(r["status"], "pending_approval");
     let id = r["request_id"].as_str().unwrap().to_string();
     let before = near_balance(&e, &e.alice).await;
-    owner_call(&e.net, &e.genesis, &e.owner, &e.vault, "approve_request", json!({ "request_id": id })).await;
+    owner_call(
+        &e.net,
+        &e.genesis,
+        &e.owner,
+        &e.vault,
+        "approve_request",
+        json!({ "request_id": id }),
+    )
+    .await;
     assert_eq!(near_balance(&e, &e.alice).await, before + 10 * one);
 
     // 9. Daily cap: 1 NEAR spent earlier (the failed one was refunded); 2 + 2 more hits 5.
     for _ in 0..2 {
-        let (r, _) =
-            agent_call(&e, "agent_transfer_near", json!({ "receiver_id": e.alice, "amount": (2 * one).to_string() }))
-                .await;
+        let (r, _) = agent_call(
+            &e,
+            "agent_transfer_near",
+            json!({ "receiver_id": e.alice, "amount": (2 * one).to_string() }),
+        )
+        .await;
         assert_eq!(r["status"], "executed", "{r}");
     }
-    let (r, _) =
-        agent_call(&e, "agent_transfer_near", json!({ "receiver_id": e.alice, "amount": (2 * one).to_string() }))
-            .await;
+    let (r, _) = agent_call(
+        &e,
+        "agent_transfer_near",
+        json!({ "receiver_id": e.alice, "amount": (2 * one).to_string() }),
+    )
+    .await;
     assert_eq!(r["code"], "OVER_DAILY_CAP");
     let agent = view(&e, "get_agent", json!({ "public_key": e.agent_pk })).await;
     assert_eq!(agent["blocked"], 4, "{agent}");
 
     // 10. Pause stops everything.
-    owner_call(&e.net, &e.genesis, &e.owner, &e.vault, "set_paused", json!({ "paused": true })).await;
-    let (r, _) = agent_call(&e, "agent_transfer_near", json!({ "receiver_id": e.alice, "amount": "1" })).await;
+    owner_call(
+        &e.net,
+        &e.genesis,
+        &e.owner,
+        &e.vault,
+        "set_paused",
+        json!({ "paused": true }),
+    )
+    .await;
+    let (r, _) = agent_call(
+        &e,
+        "agent_transfer_near",
+        json!({ "receiver_id": e.alice, "amount": "1" }),
+    )
+    .await;
     assert_eq!(r["code"], "PAUSED");
 }
 
@@ -311,7 +408,10 @@ async fn agent_key_cannot_escape_the_contract() {
         .with_signer(e.agent.clone())
         .send_to(&e.net)
         .await;
-    assert!(direct.is_err(), "direct transfer with agent key must be rejected: {direct:?}");
+    assert!(
+        direct.is_err(),
+        "direct transfer with agent key must be rejected: {direct:?}"
+    );
 
     // ...cannot call owner methods on the guard (not in the key's method list)...
     let owner_method = Contract(e.vault.clone())
@@ -320,37 +420,73 @@ async fn agent_key_cannot_escape_the_contract() {
         .with_signer(e.vault.clone(), e.agent.clone())
         .send_to(&e.net)
         .await;
-    assert!(owner_method.is_err(), "owner method with agent key must be rejected: {owner_method:?}");
+    assert!(
+        owner_method.is_err(),
+        "owner method with agent key must be rejected: {owner_method:?}"
+    );
 
     // ...cannot call any other contract (e.g. ft_transfer on the token directly)...
     let other_contract = Contract(e.usdc.clone())
-        .call_function("ft_transfer", json!({ "receiver_id": e.alice, "amount": "1" }))
+        .call_function(
+            "ft_transfer",
+            json!({ "receiver_id": e.alice, "amount": "1" }),
+        )
         .transaction()
         .with_signer(e.vault.clone(), e.agent.clone())
         .send_to(&e.net)
         .await;
-    assert!(other_contract.is_err(), "calling another contract must be rejected: {other_contract:?}");
+    assert!(
+        other_contract.is_err(),
+        "calling another contract must be rejected: {other_contract:?}"
+    );
 
     // ...and cannot attach a deposit to the allowed methods.
     let with_deposit = Contract(e.vault.clone())
-        .call_function("agent_transfer_near", json!({ "receiver_id": e.alice, "amount": "1" }))
+        .call_function(
+            "agent_transfer_near",
+            json!({ "receiver_id": e.alice, "amount": "1" }),
+        )
         .transaction()
         .deposit(NearToken::from_yoctonear(1))
         .with_signer(e.vault.clone(), e.agent.clone())
         .send_to(&e.net)
         .await;
-    assert!(with_deposit.is_err(), "deposit with a function-call key must be rejected: {with_deposit:?}");
+    assert!(
+        with_deposit.is_err(),
+        "deposit with a function-call key must be rejected: {with_deposit:?}"
+    );
 
     // The owner can revoke the agent: its key is deleted from the vault.
-    owner_call(&e.net, &e.genesis, &e.owner, &e.vault, "remove_agent", json!({ "public_key": e.agent_pk })).await;
-    let keys = Account(e.vault.clone()).list_keys().fetch_from(&e.net).await.unwrap();
-    assert!(!format!("{keys:?}").contains(&e.agent_pk), "agent key should be deleted");
+    owner_call(
+        &e.net,
+        &e.genesis,
+        &e.owner,
+        &e.vault,
+        "remove_agent",
+        json!({ "public_key": e.agent_pk }),
+    )
+    .await;
+    let keys = Account(e.vault.clone())
+        .list_keys()
+        .fetch_from(&e.net)
+        .await
+        .unwrap();
+    assert!(
+        !format!("{keys:?}").contains(&e.agent_pk),
+        "agent key should be deleted"
+    );
     let after_revoke = Contract(e.vault.clone())
-        .call_function("agent_transfer_near", json!({ "receiver_id": e.alice, "amount": "1" }))
+        .call_function(
+            "agent_transfer_near",
+            json!({ "receiver_id": e.alice, "amount": "1" }),
+        )
         .transaction()
         .with_signer(e.vault.clone(), e.agent.clone())
         .send_to(&e.net)
         .await;
-    assert!(after_revoke.is_err(), "revoked key must not sign: {after_revoke:?}");
+    assert!(
+        after_revoke.is_err(),
+        "revoked key must not sign: {after_revoke:?}"
+    );
     drop(e.sandbox);
 }

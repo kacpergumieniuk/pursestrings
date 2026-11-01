@@ -47,7 +47,9 @@ fn as_owner(ts: u64) {
 
 fn as_agent(key: &str, ts: u64) {
     let mut b = base_ctx(ts);
-    b.predecessor_account_id(vault()).signer_account_id(vault()).signer_account_pk(pk(key));
+    b.predecessor_account_id(vault())
+        .signer_account_id(vault())
+        .signer_account_pk(pk(key));
     testing_env!(b.build());
 }
 
@@ -60,11 +62,21 @@ fn as_account(a: &str, ts: u64) {
 fn as_callback(ts: u64, result: PromiseResult) {
     let mut b = base_ctx(ts);
     b.predecessor_account_id(vault()).signer_account_id(vault());
-    testing_env!(b.build(), test_vm_config(), RuntimeFeesConfig::test(), Default::default(), vec![result]);
+    testing_env!(
+        b.build(),
+        test_vm_config(),
+        RuntimeFeesConfig::test(),
+        Default::default(),
+        vec![result]
+    );
 }
 
 fn limits_near(per_tx: u128, per_day: u128) -> Vec<AssetLimitInput> {
-    vec![AssetLimitInput { asset: "near".into(), per_tx: near(per_tx), per_day: near(per_day) }]
+    vec![AssetLimitInput {
+        asset: "near".into(),
+        per_tx: near(per_tx),
+        per_day: near(per_day),
+    }]
 }
 
 /// Vault with one agent: 2 NEAR per tx, 5 NEAR per day; 100 USDC (6 dp) per tx / 250 per day.
@@ -72,7 +84,11 @@ fn setup() -> Guard {
     as_owner(T0);
     let mut g = Guard::new(owner(), None);
     let mut limits = limits_near(2, 5);
-    limits.push(AssetLimitInput { asset: usdc().to_string(), per_tx: U128(100_000_000), per_day: U128(250_000_000) });
+    limits.push(AssetLimitInput {
+        asset: usdc().to_string(),
+        per_tx: U128(100_000_000),
+        per_day: U128(250_000_000),
+    });
     let _ = g.add_agent(pk(AGENT_A), "treasury-bot".into(), limits, None);
     g.allow(ListKind::Token, vec![usdc()]);
     g
@@ -103,7 +119,8 @@ fn init_defaults() {
 fn add_agent_requires_owner() {
     let mut g = setup();
     let mut b = base_ctx(T0);
-    b.predecessor_account_id(acc("mallory.testnet")).attached_deposit(NearToken::from_yoctonear(1));
+    b.predecessor_account_id(acc("mallory.testnet"))
+        .attached_deposit(NearToken::from_yoctonear(1));
     testing_env!(b.build());
     let _ = g.add_agent(pk(AGENT_B), "evil".into(), limits_near(100, 100), None);
 }
@@ -157,7 +174,14 @@ fn over_per_tx_cap_is_blocked_and_recorded() {
     assert!(get_logs().join("").contains("transfer_blocked"));
     let v = g.get_agent(pk(AGENT_A)).unwrap();
     assert_eq!(v.blocked, 1);
-    assert_eq!(v.limits.iter().find(|l| l.asset == "near").unwrap().spent_today, U128(0));
+    assert_eq!(
+        v.limits
+            .iter()
+            .find(|l| l.asset == "near")
+            .unwrap()
+            .spent_today,
+        U128(0)
+    );
 }
 
 #[test]
@@ -172,7 +196,10 @@ fn daily_cap_accumulates_and_resets_next_day() {
     assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(1)).is_none());
     // Next UTC day the budget is fresh.
     as_agent(AGENT_A, T0 + DAY);
-    assert!(matches!(g.agent_transfer_near(acc("alice.testnet"), near(2), None), PromiseOrValue::Promise(_)));
+    assert!(matches!(
+        g.agent_transfer_near(acc("alice.testnet"), near(2), None),
+        PromiseOrValue::Promise(_)
+    ));
 }
 
 #[test]
@@ -195,7 +222,9 @@ fn tokens_need_allowlist_and_denylist_wins() {
     let mut g = setup();
     as_agent(AGENT_A, T0);
     let r = g.agent_transfer_ft(acc("scamcoin.testnet"), acc("alice.testnet"), U128(1), None);
-    let PromiseOrValue::Value(r) = r else { panic!("expected block") };
+    let PromiseOrValue::Value(r) = r else {
+        panic!("expected block")
+    };
     assert_eq!(r.code, "TOKEN_NOT_ALLOWLISTED");
 
     assert!(matches!(
@@ -204,9 +233,15 @@ fn tokens_need_allowlist_and_denylist_wins() {
     ));
 
     as_owner(T0);
-    g.report(ListKind::Token, usdc(), "issuer compromised".into(), Some("https://example.org/x".into()));
+    g.report(
+        ListKind::Token,
+        usdc(),
+        "issuer compromised".into(),
+        Some("https://example.org/x".into()),
+    );
     as_agent(AGENT_A, T0);
-    let PromiseOrValue::Value(r) = g.agent_transfer_ft(usdc(), acc("alice.testnet"), U128(1), None) else {
+    let PromiseOrValue::Value(r) = g.agent_transfer_ft(usdc(), acc("alice.testnet"), U128(1), None)
+    else {
         panic!("expected block")
     };
     assert_eq!(r.code, "TOKEN_DENYLISTED");
@@ -217,7 +252,9 @@ fn tokens_need_allowlist_and_denylist_wins() {
 fn token_caps_are_independent_of_near_caps() {
     let mut g = setup();
     as_agent(AGENT_A, T0);
-    let PromiseOrValue::Value(r) = g.agent_transfer_ft(usdc(), acc("alice.testnet"), U128(100_000_001), None) else {
+    let PromiseOrValue::Value(r) =
+        g.agent_transfer_ft(usdc(), acc("alice.testnet"), U128(100_000_001), None)
+    else {
         panic!("expected block")
     };
     assert_eq!(r.code, "OVER_TX_CAP");
@@ -225,8 +262,12 @@ fn token_caps_are_independent_of_near_caps() {
     as_owner(T0);
     g.allow(ListKind::Token, vec![acc("usdt.fakes.testnet")]);
     as_agent(AGENT_A, T0);
-    let PromiseOrValue::Value(r) = g.agent_transfer_ft(acc("usdt.fakes.testnet"), acc("alice.testnet"), U128(1), None)
-    else {
+    let PromiseOrValue::Value(r) = g.agent_transfer_ft(
+        acc("usdt.fakes.testnet"),
+        acc("alice.testnet"),
+        U128(1),
+        None,
+    ) else {
         panic!("expected block")
     };
     assert_eq!(r.code, "ASSET_NOT_PERMITTED");
@@ -236,14 +277,25 @@ fn token_caps_are_independent_of_near_caps() {
 fn recipient_denylist_covers_sub_accounts_only() {
     let mut g = setup();
     as_owner(T0);
-    g.report(ListKind::Recipient, acc("drainer.testnet"), "known drainer".into(), None);
+    g.report(
+        ListKind::Recipient,
+        acc("drainer.testnet"),
+        "known drainer".into(),
+        None,
+    );
     let r = send_near(&mut g, AGENT_A, "claim.drainer.testnet", near(1)).unwrap();
     assert_eq!(r.code, "RECIPIENT_DENYLISTED");
     assert!(r.reason.contains("drainer.testnet"));
     // A different account that merely ends with the same letters is not affected.
     assert!(send_near(&mut g, AGENT_A, "notdrainer.testnet", near(1)).is_none());
-    assert!(g.get_deny_entry(ListKind::Recipient, acc("a.b.drainer.testnet")).is_some());
-    assert!(g.get_deny_entry(ListKind::Recipient, acc("xdrainer.testnet")).is_none());
+    assert!(
+        g.get_deny_entry(ListKind::Recipient, acc("a.b.drainer.testnet"))
+            .is_some()
+    );
+    assert!(
+        g.get_deny_entry(ListKind::Recipient, acc("xdrainer.testnet"))
+            .is_none()
+    );
 }
 
 #[test]
@@ -257,7 +309,12 @@ fn recipient_allowlist_mode() {
     assert_eq!(r.code, "RECIPIENT_NOT_ALLOWLISTED");
     as_owner(T0);
     g.unallow(ListKind::Recipient, vec![acc("payroll.testnet")]);
-    assert_eq!(send_near(&mut g, AGENT_A, "payroll.testnet", near(1)).unwrap().code, "RECIPIENT_NOT_ALLOWLISTED");
+    assert_eq!(
+        send_near(&mut g, AGENT_A, "payroll.testnet", near(1))
+            .unwrap()
+            .code,
+        "RECIPIENT_NOT_ALLOWLISTED"
+    );
 }
 
 #[test]
@@ -265,18 +322,38 @@ fn pause_and_disable() {
     let mut g = setup();
     as_owner(T0);
     g.set_paused(true);
-    assert_eq!(send_near(&mut g, AGENT_A, "alice.testnet", near(1)).unwrap().code, "PAUSED");
+    assert_eq!(
+        send_near(&mut g, AGENT_A, "alice.testnet", near(1))
+            .unwrap()
+            .code,
+        "PAUSED"
+    );
     as_owner(T0);
     g.set_paused(false);
     g.set_agent_enabled(pk(AGENT_A), false);
-    assert_eq!(send_near(&mut g, AGENT_A, "alice.testnet", near(1)).unwrap().code, "AGENT_DISABLED");
+    assert_eq!(
+        send_near(&mut g, AGENT_A, "alice.testnet", near(1))
+            .unwrap()
+            .code,
+        "AGENT_DISABLED"
+    );
 }
 
 #[test]
 fn zero_and_self_transfers_are_blocked() {
     let mut g = setup();
-    assert_eq!(send_near(&mut g, AGENT_A, "alice.testnet", U128(0)).unwrap().code, "ZERO_AMOUNT");
-    assert_eq!(send_near(&mut g, AGENT_A, "vault.testnet", near(1)).unwrap().code, "SELF_TRANSFER");
+    assert_eq!(
+        send_near(&mut g, AGENT_A, "alice.testnet", U128(0))
+            .unwrap()
+            .code,
+        "ZERO_AMOUNT"
+    );
+    assert_eq!(
+        send_near(&mut g, AGENT_A, "vault.testnet", near(1))
+            .unwrap()
+            .code,
+        "SELF_TRANSFER"
+    );
 }
 
 #[test]
@@ -295,7 +372,12 @@ fn reporters() {
     as_owner(T0);
     g.set_reporter(acc("risk-oracle.testnet"), true);
     as_account("risk-oracle.testnet", T0);
-    g.report(ListKind::Recipient, acc("phish.testnet"), "lookalike of wrap.testnet".into(), None);
+    g.report(
+        ListKind::Recipient,
+        acc("phish.testnet"),
+        "lookalike of wrap.testnet".into(),
+        None,
+    );
     let denied = g.list_denied(ListKind::Recipient, None, None);
     assert_eq!(denied.len(), 1);
     assert_eq!(denied[0].entry.reported_by, acc("risk-oracle.testnet"));
@@ -306,14 +388,25 @@ fn reporters() {
 fn strangers_cannot_report() {
     let mut g = setup();
     as_account("mallory.testnet", T0);
-    g.report(ListKind::Recipient, acc("alice.testnet"), "grief".into(), None);
+    g.report(
+        ListKind::Recipient,
+        acc("alice.testnet"),
+        "grief".into(),
+        None,
+    );
 }
 
 #[test]
 fn over_cap_can_be_escalated_and_approved() {
     let mut g = setup();
     as_agent(AGENT_A, T0);
-    let r = g.agent_request_approval("near".into(), acc("vendor.testnet"), near(20), None, "annual invoice".into());
+    let r = g.agent_request_approval(
+        "near".into(),
+        acc("vendor.testnet"),
+        near(20),
+        None,
+        "annual invoice".into(),
+    );
     assert_eq!(r.status, "pending_approval");
     assert_eq!(r.code, "OVER_TX_CAP");
     let id = r.request_id.unwrap();
@@ -326,7 +419,13 @@ fn over_cap_can_be_escalated_and_approved() {
     assert_eq!(g.get_agent(pk(AGENT_A)).unwrap().pending, 0);
     assert!(get_logs().join("").contains("approval_resolved"));
     // Approved transfers do not consume the agent's own daily budget.
-    let near_l = g.get_agent(pk(AGENT_A)).unwrap().limits.into_iter().find(|l| l.asset == "near").unwrap();
+    let near_l = g
+        .get_agent(pk(AGENT_A))
+        .unwrap()
+        .limits
+        .into_iter()
+        .find(|l| l.asset == "near")
+        .unwrap();
     assert_eq!(near_l.spent_today, U128(0));
 }
 
@@ -334,9 +433,20 @@ fn over_cap_can_be_escalated_and_approved() {
 fn denylisted_recipient_cannot_be_escalated() {
     let mut g = setup();
     as_owner(T0);
-    g.report(ListKind::Recipient, acc("drainer.testnet"), "known drainer".into(), None);
+    g.report(
+        ListKind::Recipient,
+        acc("drainer.testnet"),
+        "known drainer".into(),
+        None,
+    );
     as_agent(AGENT_A, T0);
-    let r = g.agent_request_approval("near".into(), acc("drainer.testnet"), near(1), None, "trust me".into());
+    let r = g.agent_request_approval(
+        "near".into(),
+        acc("drainer.testnet"),
+        near(1),
+        None,
+        "trust me".into(),
+    );
     assert_eq!(r.status, "blocked");
     assert_eq!(r.code, "RECIPIENT_DENYLISTED");
     assert!(g.list_pending(None, None).is_empty());
@@ -347,14 +457,29 @@ fn hard_blocks_win_over_soft_ones() {
     // Unknown token (soft) + denylisted recipient (hard): the hard block is reported and cannot be escalated.
     let mut g = setup();
     as_owner(T0);
-    g.report(ListKind::Recipient, acc("drainer.testnet"), "known drainer".into(), None);
+    g.report(
+        ListKind::Recipient,
+        acc("drainer.testnet"),
+        "known drainer".into(),
+        None,
+    );
     as_agent(AGENT_A, T0);
-    let PromiseOrValue::Value(r) = g.agent_transfer_ft(acc("fake-usdc.testnet"), acc("claim.drainer.testnet"), U128(1), None)
-    else {
+    let PromiseOrValue::Value(r) = g.agent_transfer_ft(
+        acc("fake-usdc.testnet"),
+        acc("claim.drainer.testnet"),
+        U128(1),
+        None,
+    ) else {
         panic!("expected block")
     };
     assert_eq!(r.code, "RECIPIENT_DENYLISTED");
-    let r = g.agent_request_approval("fake-usdc.testnet".into(), acc("claim.drainer.testnet"), U128(1), None, "x".into());
+    let r = g.agent_request_approval(
+        "fake-usdc.testnet".into(),
+        acc("claim.drainer.testnet"),
+        U128(1),
+        None,
+        "x".into(),
+    );
     assert_eq!(r.status, "blocked");
     assert!(g.list_pending(None, None).is_empty());
 }
@@ -364,9 +489,20 @@ fn hard_blocks_win_over_soft_ones() {
 fn approval_rechecks_denylist() {
     let mut g = setup();
     as_agent(AGENT_A, T0);
-    let r = g.agent_request_approval("near".into(), acc("vendor.testnet"), near(20), None, "x".into());
+    let r = g.agent_request_approval(
+        "near".into(),
+        acc("vendor.testnet"),
+        near(20),
+        None,
+        "x".into(),
+    );
     as_owner(T0);
-    g.report(ListKind::Recipient, acc("vendor.testnet"), "vendor got hacked".into(), None);
+    g.report(
+        ListKind::Recipient,
+        acc("vendor.testnet"),
+        "vendor got hacked".into(),
+        None,
+    );
     let _ = g.approve_request(r.request_id.unwrap());
 }
 
@@ -376,13 +512,30 @@ fn pending_requests_are_bounded_and_rejectable() {
     as_agent(AGENT_A, T0);
     let mut last = None;
     for _ in 0..MAX_PENDING_PER_AGENT {
-        last = g.agent_request_approval("near".into(), acc("vendor.testnet"), near(20), None, "x".into()).request_id;
+        last = g
+            .agent_request_approval(
+                "near".into(),
+                acc("vendor.testnet"),
+                near(20),
+                None,
+                "x".into(),
+            )
+            .request_id;
     }
-    let r = g.agent_request_approval("near".into(), acc("vendor.testnet"), near(20), None, "x".into());
+    let r = g.agent_request_approval(
+        "near".into(),
+        acc("vendor.testnet"),
+        near(20),
+        None,
+        "x".into(),
+    );
     assert_eq!(r.code, "TOO_MANY_PENDING");
     as_owner(T0);
     g.reject_request(last.unwrap(), Some("no".into()));
-    assert_eq!(g.get_agent(pk(AGENT_A)).unwrap().pending, MAX_PENDING_PER_AGENT - 1);
+    assert_eq!(
+        g.get_agent(pk(AGENT_A)).unwrap().pending,
+        MAX_PENDING_PER_AGENT - 1
+    );
 }
 
 #[test]
@@ -390,9 +543,22 @@ fn failed_transfer_refunds_daily_budget() {
     let mut g = setup();
     assert!(send_near(&mut g, AGENT_A, "ghost.testnet", near(2)).is_none());
     as_callback(T0, PromiseResult::Failed);
-    let r = g.on_transfer_settled(AGENT_A.into(), "near".into(), acc("ghost.testnet"), near(2), U64(T0 / DAY), true);
+    let r = g.on_transfer_settled(
+        AGENT_A.into(),
+        "near".into(),
+        acc("ghost.testnet"),
+        near(2),
+        U64(T0 / DAY),
+        true,
+    );
     assert_eq!(r.status, "failed");
-    let l = g.get_agent(pk(AGENT_A)).unwrap().limits.into_iter().find(|l| l.asset == "near").unwrap();
+    let l = g
+        .get_agent(pk(AGENT_A))
+        .unwrap()
+        .limits
+        .into_iter()
+        .find(|l| l.asset == "near")
+        .unwrap();
     assert_eq!(l.spent_today, U128(0));
 }
 
@@ -401,7 +567,14 @@ fn successful_settlement_counts_execution() {
     let mut g = setup();
     assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(1)).is_none());
     as_callback(T0, PromiseResult::Successful(vec![]));
-    let r = g.on_transfer_settled(AGENT_A.into(), "near".into(), acc("alice.testnet"), near(1), U64(T0 / DAY), true);
+    let r = g.on_transfer_settled(
+        AGENT_A.into(),
+        "near".into(),
+        acc("alice.testnet"),
+        near(1),
+        U64(T0 / DAY),
+        true,
+    );
     assert_eq!(r.status, "executed");
     assert_eq!(g.get_agent(pk(AGENT_A)).unwrap().executed, 1);
 }
@@ -410,22 +583,47 @@ fn successful_settlement_counts_execution() {
 fn remove_agent_drops_pending_and_key() {
     let mut g = setup();
     as_agent(AGENT_A, T0);
-    g.agent_request_approval("near".into(), acc("vendor.testnet"), near(20), None, "x".into());
+    g.agent_request_approval(
+        "near".into(),
+        acc("vendor.testnet"),
+        near(20),
+        None,
+        "x".into(),
+    );
     as_owner(T0);
     let _ = g.remove_agent(pk(AGENT_A));
     assert!(g.get_agent(pk(AGENT_A)).is_none());
     assert!(g.list_pending(None, None).is_empty());
-    assert_eq!(send_near(&mut g, AGENT_A, "alice.testnet", near(1)).unwrap().code, "UNKNOWN_AGENT");
+    assert_eq!(
+        send_near(&mut g, AGENT_A, "alice.testnet", near(1))
+            .unwrap()
+            .code,
+        "UNKNOWN_AGENT"
+    );
 }
 
 #[test]
 fn preflight_matches_enforcement() {
     let g = setup();
     as_account("anyone.testnet", T0);
-    assert_eq!(g.preflight(pk(AGENT_A), "near".into(), acc("alice.testnet"), near(1)).status, "allowed");
-    assert_eq!(g.preflight(pk(AGENT_A), "NEAR".into(), acc("alice.testnet"), near(3)).code, "OVER_TX_CAP");
     assert_eq!(
-        g.preflight(pk(AGENT_A), "scam.testnet".into(), acc("alice.testnet"), U128(1)).code,
+        g.preflight(pk(AGENT_A), "near".into(), acc("alice.testnet"), near(1))
+            .status,
+        "allowed"
+    );
+    assert_eq!(
+        g.preflight(pk(AGENT_A), "NEAR".into(), acc("alice.testnet"), near(3))
+            .code,
+        "OVER_TX_CAP"
+    );
+    assert_eq!(
+        g.preflight(
+            pk(AGENT_A),
+            "scam.testnet".into(),
+            acc("alice.testnet"),
+            U128(1)
+        )
+        .code,
         "TOKEN_NOT_ALLOWLISTED"
     );
 }
@@ -436,7 +634,12 @@ fn multiple_agents_have_separate_budgets() {
     as_owner(T0);
     let _ = g.add_agent(pk(AGENT_B), "grants-bot".into(), limits_near(1, 1), None);
     assert!(send_near(&mut g, AGENT_A, "alice.testnet", near(2)).is_none());
-    assert_eq!(send_near(&mut g, AGENT_B, "alice.testnet", near(2)).unwrap().code, "OVER_TX_CAP");
+    assert_eq!(
+        send_near(&mut g, AGENT_B, "alice.testnet", near(2))
+            .unwrap()
+            .code,
+        "OVER_TX_CAP"
+    );
     assert!(send_near(&mut g, AGENT_B, "alice.testnet", near(1)).is_none());
     assert_eq!(g.list_agents(None, None).len(), 2);
 }

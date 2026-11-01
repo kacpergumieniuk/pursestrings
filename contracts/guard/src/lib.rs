@@ -21,8 +21,8 @@ use std::collections::BTreeMap;
 use near_sdk::json_types::{U64, U128};
 use near_sdk::store::{IterableMap, IterableSet};
 use near_sdk::{
-    AccountId, Allowance, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise,
-    PromiseOrValue, PublicKey, assert_one_yocto, env, near, require,
+    AccountId, Allowance, BorshStorageKey, Gas, NearToken, PanicOnDefault, Promise, PromiseOrValue,
+    PublicKey, assert_one_yocto, env, near, require,
 };
 
 /// Asset id used for native NEAR. Any other asset id is a NEP-141 token contract.
@@ -230,7 +230,12 @@ impl Block {
 #[near(event_json(standard = "nearguard"))]
 pub enum GuardEvent {
     #[event_version("1.0.0")]
-    TransferAllowed { agent: String, asset: String, receiver_id: AccountId, amount: U128 },
+    TransferAllowed {
+        agent: String,
+        asset: String,
+        receiver_id: AccountId,
+        amount: U128,
+    },
     #[event_version("1.0.0")]
     TransferBlocked {
         agent: String,
@@ -241,11 +246,28 @@ pub enum GuardEvent {
         reason: String,
     },
     #[event_version("1.0.0")]
-    TransferSettled { agent: String, asset: String, receiver_id: AccountId, amount: U128, success: bool },
+    TransferSettled {
+        agent: String,
+        asset: String,
+        receiver_id: AccountId,
+        amount: U128,
+        success: bool,
+    },
     #[event_version("1.0.0")]
-    ApprovalRequested { request_id: U64, agent: String, asset: String, receiver_id: AccountId, amount: U128, code: String },
+    ApprovalRequested {
+        request_id: U64,
+        agent: String,
+        asset: String,
+        receiver_id: AccountId,
+        amount: U128,
+        code: String,
+    },
     #[event_version("1.0.0")]
-    ApprovalResolved { request_id: U64, approved: bool, note: Option<String> },
+    ApprovalResolved {
+        request_id: U64,
+        approved: bool,
+        note: Option<String>,
+    },
     #[event_version("1.0.0")]
     AgentAdded { public_key: String, name: String },
     #[event_version("1.0.0")]
@@ -253,7 +275,13 @@ pub enum GuardEvent {
     #[event_version("1.0.0")]
     PolicyChanged { change: String },
     #[event_version("1.0.0")]
-    Reported { kind: ListKind, account_id: AccountId, reporter: AccountId, reason: String, evidence: Option<String> },
+    Reported {
+        kind: ListKind,
+        account_id: AccountId,
+        reporter: AccountId,
+        reason: String,
+        evidence: Option<String>,
+    },
 }
 
 #[near(contract_state)]
@@ -280,7 +308,10 @@ fn day_index(ts: u64) -> u64 {
 }
 
 fn check_text(s: &str, what: &str) {
-    require!(s.len() <= MAX_TEXT_LEN, format!("{what} is too long (max {MAX_TEXT_LEN} bytes)"));
+    require!(
+        s.len() <= MAX_TEXT_LEN,
+        format!("{what} is too long (max {MAX_TEXT_LEN} bytes)")
+    );
 }
 
 /// Human-readable amount for messages: `0.2 NEAR` for NEAR, raw units for tokens.
@@ -454,12 +485,11 @@ impl Guard {
         if let Some(agent) = self.agents.get_mut(&agent_key) {
             if success {
                 agent.executed += 1;
-            } else if counted {
-                if let Some((d, spent)) = agent.spent.get_mut(&asset) {
-                    if *d == day.0 {
-                        *spent = spent.saturating_sub(amount.0);
-                    }
-                }
+            } else if counted
+                && let Some((d, spent)) = agent.spent.get_mut(&asset)
+                && *d == day.0
+            {
+                *spent = spent.saturating_sub(amount.0);
             }
         }
         GuardEvent::TransferSettled {
@@ -505,7 +535,10 @@ impl Guard {
         self.assert_owner();
         check_text(&name, "name");
         let key = pk_string(&public_key);
-        require!(!self.agents.contains_key(&key), "agent key already registered");
+        require!(
+            !self.agents.contains_key(&key),
+            "agent key already registered"
+        );
         let agent = Agent {
             name: name.clone(),
             enabled: true,
@@ -522,7 +555,11 @@ impl Guard {
                 .unwrap_or_else(|| env::panic_str("key_allowance must be > 0")),
             None => Allowance::limited(DEFAULT_KEY_ALLOWANCE).unwrap(),
         };
-        GuardEvent::AgentAdded { public_key: key, name }.emit();
+        GuardEvent::AgentAdded {
+            public_key: key,
+            name,
+        }
+        .emit();
         Promise::new(env::current_account_id()).add_access_key_allowance(
             public_key,
             allowance,
@@ -554,9 +591,15 @@ impl Guard {
     pub fn set_agent_enabled(&mut self, public_key: PublicKey, enabled: bool) {
         self.assert_owner();
         let key = pk_string(&public_key);
-        let agent = self.agents.get_mut(&key).unwrap_or_else(|| env::panic_str("unknown agent"));
+        let agent = self
+            .agents
+            .get_mut(&key)
+            .unwrap_or_else(|| env::panic_str("unknown agent"));
         agent.enabled = enabled;
-        GuardEvent::PolicyChanged { change: format!("agent {key} enabled={enabled}") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("agent {key} enabled={enabled}"),
+        }
+        .emit();
     }
 
     /// Replace an agent's limits. Today's spend is kept.
@@ -565,9 +608,15 @@ impl Guard {
         self.assert_owner();
         let key = pk_string(&public_key);
         let limits = Self::limits_from_input(limits);
-        let agent = self.agents.get_mut(&key).unwrap_or_else(|| env::panic_str("unknown agent"));
+        let agent = self
+            .agents
+            .get_mut(&key)
+            .unwrap_or_else(|| env::panic_str("unknown agent"));
         agent.limits = limits;
-        GuardEvent::PolicyChanged { change: format!("agent {key} limits updated") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("agent {key} limits updated"),
+        }
+        .emit();
     }
 
     // ------------------------------------------------------------------
@@ -581,7 +630,10 @@ impl Guard {
             ListKind::Recipient => self.recipient_mode = mode,
             ListKind::Token => self.token_mode = mode,
         }
-        GuardEvent::PolicyChanged { change: format!("{kind:?} mode={mode:?}") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("{kind:?} mode={mode:?}"),
+        }
+        .emit();
     }
 
     #[payable]
@@ -593,7 +645,10 @@ impl Guard {
                 ListKind::Token => self.token_allow.insert(a),
             };
         }
-        GuardEvent::PolicyChanged { change: format!("{kind:?} allowlist updated") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("{kind:?} allowlist updated"),
+        }
+        .emit();
     }
 
     #[payable]
@@ -605,12 +660,21 @@ impl Guard {
                 ListKind::Token => self.token_allow.remove(&a),
             };
         }
-        GuardEvent::PolicyChanged { change: format!("{kind:?} allowlist updated") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("{kind:?} allowlist updated"),
+        }
+        .emit();
     }
 
     /// Add to a denylist with a reason and optional evidence link.
     /// Callable by the owner or by an approved reporter (e.g. the off-chain risk service).
-    pub fn report(&mut self, kind: ListKind, account_id: AccountId, reason: String, evidence: Option<String>) {
+    pub fn report(
+        &mut self,
+        kind: ListKind,
+        account_id: AccountId,
+        reason: String,
+        evidence: Option<String>,
+    ) {
         let caller = env::predecessor_account_id();
         require!(
             caller == self.owner_id || self.reporters.contains(&caller),
@@ -630,7 +694,14 @@ impl Guard {
             ListKind::Recipient => self.recipient_deny.insert(account_id.clone(), entry),
             ListKind::Token => self.token_deny.insert(account_id.clone(), entry),
         };
-        GuardEvent::Reported { kind, account_id, reporter: caller, reason, evidence }.emit();
+        GuardEvent::Reported {
+            kind,
+            account_id,
+            reporter: caller,
+            reason,
+            evidence,
+        }
+        .emit();
     }
 
     /// Remove a denylist entry. Owner only.
@@ -641,7 +712,10 @@ impl Guard {
             ListKind::Recipient => self.recipient_deny.remove(&account_id),
             ListKind::Token => self.token_deny.remove(&account_id),
         };
-        GuardEvent::PolicyChanged { change: format!("{kind:?} denylist: removed {account_id}") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("{kind:?} denylist: removed {account_id}"),
+        }
+        .emit();
     }
 
     #[payable]
@@ -652,7 +726,10 @@ impl Guard {
         } else {
             self.reporters.remove(&account_id);
         }
-        GuardEvent::PolicyChanged { change: format!("reporter {account_id} enabled={enabled}") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("reporter {account_id} enabled={enabled}"),
+        }
+        .emit();
     }
 
     /// Emergency stop: every agent action is blocked while paused.
@@ -660,20 +737,29 @@ impl Guard {
     pub fn set_paused(&mut self, paused: bool) {
         self.assert_owner();
         self.paused = paused;
-        GuardEvent::PolicyChanged { change: format!("paused={paused}") }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("paused={paused}"),
+        }
+        .emit();
     }
 
     #[payable]
     pub fn set_min_balance_reserve(&mut self, amount: U128) {
         self.assert_owner();
         self.min_balance_reserve = amount.0;
-        GuardEvent::PolicyChanged { change: format!("min_balance_reserve={}", amount.0) }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("min_balance_reserve={}", amount.0),
+        }
+        .emit();
     }
 
     #[payable]
     pub fn transfer_ownership(&mut self, new_owner_id: AccountId) {
         self.assert_owner();
-        GuardEvent::PolicyChanged { change: format!("owner {} -> {}", self.owner_id, new_owner_id) }.emit();
+        GuardEvent::PolicyChanged {
+            change: format!("owner {} -> {}", self.owner_id, new_owner_id),
+        }
+        .emit();
         self.owner_id = new_owner_id;
     }
 
@@ -694,14 +780,35 @@ impl Guard {
         }
         if req.asset != NEAR_ASSET {
             let token: AccountId = req.asset.parse().unwrap();
-            require!(self.token_deny_entry(&token).is_none(), "token is denylisted");
+            require!(
+                self.token_deny_entry(&token).is_none(),
+                "token is denylisted"
+            );
         }
-        require!(self.recipient_deny_entry(&req.receiver_id).is_none(), "recipient is denylisted");
+        require!(
+            self.recipient_deny_entry(&req.receiver_id).is_none(),
+            "recipient is denylisted"
+        );
         if req.asset == NEAR_ASSET {
-            require!(self.spendable_near() >= req.amount.0, "insufficient NEAR above the reserve");
+            require!(
+                self.spendable_near() >= req.amount.0,
+                "insufficient NEAR above the reserve"
+            );
         }
-        GuardEvent::ApprovalResolved { request_id, approved: true, note: None }.emit();
-        self.start_transfer(req.agent_key, req.asset, req.receiver_id, req.amount, req.memo, false)
+        GuardEvent::ApprovalResolved {
+            request_id,
+            approved: true,
+            note: None,
+        }
+        .emit();
+        self.start_transfer(
+            req.agent_key,
+            req.asset,
+            req.receiver_id,
+            req.amount,
+            req.memo,
+            false,
+        )
     }
 
     #[payable]
@@ -717,16 +824,29 @@ impl Guard {
         if let Some(agent) = self.agents.get_mut(&req.agent_key) {
             agent.pending = agent.pending.saturating_sub(1);
         }
-        GuardEvent::ApprovalResolved { request_id, approved: false, note }.emit();
+        GuardEvent::ApprovalResolved {
+            request_id,
+            approved: false,
+            note,
+        }
+        .emit();
     }
 
     /// Owner withdrawal of NEAR or a token. Not subject to agent caps.
     #[payable]
-    pub fn owner_withdraw(&mut self, asset: String, receiver_id: AccountId, amount: U128) -> Promise {
+    pub fn owner_withdraw(
+        &mut self,
+        asset: String,
+        receiver_id: AccountId,
+        amount: U128,
+    ) -> Promise {
         self.assert_owner();
         let asset = Self::normalize_asset(&asset);
         if asset == NEAR_ASSET {
-            require!(self.spendable_near() >= amount.0, "insufficient NEAR above the reserve");
+            require!(
+                self.spendable_near() >= amount.0,
+                "insufficient NEAR above the reserve"
+            );
         }
         self.start_transfer("owner".into(), asset, receiver_id, amount, None, false)
     }
@@ -736,7 +856,13 @@ impl Guard {
     // ------------------------------------------------------------------
 
     /// Dry-run the on-chain policy for an agent key without sending anything.
-    pub fn preflight(&self, public_key: PublicKey, asset: String, receiver_id: AccountId, amount: U128) -> GuardResult {
+    pub fn preflight(
+        &self,
+        public_key: PublicKey,
+        asset: String,
+        receiver_id: AccountId,
+        amount: U128,
+    ) -> GuardResult {
         let asset = Self::normalize_asset(&asset);
         match self.evaluate(&pk_string(&public_key), &asset, &receiver_id, amount.0) {
             Ok(()) => GuardResult {
@@ -748,7 +874,13 @@ impl Guard {
             Err(b) => GuardResult {
                 status: "blocked".into(),
                 code: b.code().into(),
-                reason: self.block_reason(b, &pk_string(&public_key), &asset, &receiver_id, amount.0),
+                reason: self.block_reason(
+                    b,
+                    &pk_string(&public_key),
+                    &asset,
+                    &receiver_id,
+                    amount.0,
+                ),
                 request_id: None,
             },
         }
@@ -781,7 +913,12 @@ impl Guard {
             .collect()
     }
 
-    pub fn list_allowed(&self, kind: ListKind, from_index: Option<u32>, limit: Option<u32>) -> Vec<AccountId> {
+    pub fn list_allowed(
+        &self,
+        kind: ListKind,
+        from_index: Option<u32>,
+        limit: Option<u32>,
+    ) -> Vec<AccountId> {
         let set = match kind {
             ListKind::Recipient => &self.recipient_allow,
             ListKind::Token => &self.token_allow,
@@ -793,7 +930,12 @@ impl Guard {
             .collect()
     }
 
-    pub fn list_denied(&self, kind: ListKind, from_index: Option<u32>, limit: Option<u32>) -> Vec<DenyView> {
+    pub fn list_denied(
+        &self,
+        kind: ListKind,
+        from_index: Option<u32>,
+        limit: Option<u32>,
+    ) -> Vec<DenyView> {
         let map = match kind {
             ListKind::Recipient => &self.recipient_deny,
             ListKind::Token => &self.token_deny,
@@ -801,7 +943,10 @@ impl Guard {
         map.iter()
             .skip(from_index.unwrap_or(0) as usize)
             .take(limit.unwrap_or(MAX_PAGE).min(MAX_PAGE) as usize)
-            .map(|(a, e)| DenyView { account_id: a.clone(), entry: e.clone() })
+            .map(|(a, e)| DenyView {
+                account_id: a.clone(),
+                entry: e.clone(),
+            })
             .collect()
     }
 
@@ -811,7 +956,10 @@ impl Guard {
             ListKind::Recipient => self.recipient_deny_entry(&account_id),
             ListKind::Token => self.token_deny_entry(&account_id),
         };
-        hit.map(|(a, e)| DenyView { account_id: a, entry: e })
+        hit.map(|(a, e)| DenyView {
+            account_id: a,
+            entry: e,
+        })
     }
 
     pub fn list_pending(&self, from_index: Option<u32>, limit: Option<u32>) -> Vec<PendingRequest> {
@@ -851,15 +999,26 @@ impl Guard {
         if a == NEAR_ASSET {
             return a;
         }
-        let id: AccountId = a.parse().unwrap_or_else(|_| env::panic_str("asset must be \"near\" or a token account id"));
+        let id: AccountId = a
+            .parse()
+            .unwrap_or_else(|_| env::panic_str("asset must be \"near\" or a token account id"));
         id.to_string()
     }
 
     fn limits_from_input(limits: Vec<AssetLimitInput>) -> BTreeMap<String, AssetLimit> {
         let mut out = BTreeMap::new();
         for l in limits {
-            require!(l.per_tx.0 <= l.per_day.0, "per_tx cap cannot exceed per_day cap");
-            out.insert(Self::normalize_asset(&l.asset), AssetLimit { per_tx: l.per_tx, per_day: l.per_day });
+            require!(
+                l.per_tx.0 <= l.per_day.0,
+                "per_tx cap cannot exceed per_day cap"
+            );
+            out.insert(
+                Self::normalize_asset(&l.asset),
+                AssetLimit {
+                    per_tx: l.per_tx,
+                    per_day: l.per_day,
+                },
+            );
         }
         out
     }
@@ -873,7 +1032,10 @@ impl Guard {
     }
 
     /// Exact match first, then every parent account (`a.b.c` -> `b.c` -> `c`).
-    fn deny_lookup(map: &IterableMap<AccountId, DenyEntry>, account: &AccountId) -> Option<(AccountId, DenyEntry)> {
+    fn deny_lookup(
+        map: &IterableMap<AccountId, DenyEntry>,
+        account: &AccountId,
+    ) -> Option<(AccountId, DenyEntry)> {
         let s = account.as_str();
         let mut candidates = vec![s];
         for (i, ch) in s.char_indices() {
@@ -882,11 +1044,11 @@ impl Guard {
             }
         }
         for c in candidates {
-            if let Ok(id) = c.parse::<AccountId>() {
-                if let Some(e) = map.get(&id) {
-                    debug_assert!(is_same_or_sub(account, &id));
-                    return Some((id, e.clone()));
-                }
+            if let Ok(id) = c.parse::<AccountId>()
+                && let Some(e) = map.get(&id)
+            {
+                debug_assert!(is_same_or_sub(account, &id));
+                return Some((id, e.clone()));
             }
         }
         None
@@ -908,7 +1070,13 @@ impl Guard {
     }
 
     /// The policy, in order. Returns the first violation.
-    fn evaluate(&self, key: &str, asset: &str, receiver: &AccountId, amount: u128) -> Result<(), Block> {
+    fn evaluate(
+        &self,
+        key: &str,
+        asset: &str,
+        receiver: &AccountId,
+        amount: u128,
+    ) -> Result<(), Block> {
         if self.paused {
             return Err(Block::Paused);
         }
@@ -928,21 +1096,24 @@ impl Guard {
         } else {
             Some(asset.parse().map_err(|_| Block::AssetNotPermitted)?)
         };
-        if let Some(t) = &token {
-            if self.token_deny_entry(t).is_some() {
-                return Err(Block::TokenDenylisted);
-            }
+        if let Some(t) = &token
+            && self.token_deny_entry(t).is_some()
+        {
+            return Err(Block::TokenDenylisted);
         }
         if self.recipient_deny_entry(receiver).is_some() {
             return Err(Block::RecipientDenylisted);
         }
         // Soft violations: a human may approve these.
-        if let Some(t) = &token {
-            if self.token_mode == ListMode::AllowlistOnly && !self.token_allow.contains(t) {
-                return Err(Block::TokenNotAllowlisted);
-            }
+        if let Some(t) = &token
+            && self.token_mode == ListMode::AllowlistOnly
+            && !self.token_allow.contains(t)
+        {
+            return Err(Block::TokenNotAllowlisted);
         }
-        if self.recipient_mode == ListMode::AllowlistOnly && !self.recipient_allow.contains(receiver) {
+        if self.recipient_mode == ListMode::AllowlistOnly
+            && !self.recipient_allow.contains(receiver)
+        {
             return Err(Block::RecipientNotAllowlisted);
         }
         let limit = agent.limits.get(asset).ok_or(Block::AssetNotPermitted)?;
@@ -960,7 +1131,14 @@ impl Guard {
         Ok(())
     }
 
-    fn block_reason(&self, b: Block, key: &str, asset: &str, receiver: &AccountId, amount: u128) -> String {
+    fn block_reason(
+        &self,
+        b: Block,
+        key: &str,
+        asset: &str,
+        receiver: &AccountId,
+        amount: u128,
+    ) -> String {
         let today = day_index(env::block_timestamp());
         let agent = self.agents.get(key);
         let limit = agent.and_then(|a| a.limits.get(asset));
@@ -979,7 +1157,9 @@ impl Guard {
                 let (hit, e) = self.recipient_deny_entry(receiver).unwrap();
                 format!("recipient {hit} is denylisted: {}", e.reason)
             }
-            Block::RecipientNotAllowlisted => format!("recipient {receiver} is not on the recipient allowlist"),
+            Block::RecipientNotAllowlisted => {
+                format!("recipient {receiver} is not on the recipient allowlist")
+            }
             Block::AssetNotPermitted => format!("this agent has no budget for {asset}"),
             Block::OverTxCap => format!(
                 "{} exceeds the per-transaction cap of {}",
@@ -987,7 +1167,9 @@ impl Guard {
                 fmt_amount(asset, limit.map(|l| l.per_tx.0).unwrap_or(0))
             ),
             Block::OverDailyCap => {
-                let spent = agent.map(|a| Self::spent_today(a, asset, today)).unwrap_or(0);
+                let spent = agent
+                    .map(|a| Self::spent_today(a, asset, today))
+                    .unwrap_or(0);
                 format!(
                     "{} + {} spent today exceeds the daily cap of {}",
                     fmt_amount(asset, amount),
@@ -1003,7 +1185,14 @@ impl Guard {
         }
     }
 
-    fn record_block(&mut self, key: &str, asset: &str, receiver: &AccountId, amount: U128, b: Block) -> GuardResult {
+    fn record_block(
+        &mut self,
+        key: &str,
+        asset: &str,
+        receiver: &AccountId,
+        amount: U128,
+        b: Block,
+    ) -> GuardResult {
         let reason = self.block_reason(b, key, asset, receiver, amount.0);
         if let Some(agent) = self.agents.get_mut(key) {
             agent.blocked += 1;
@@ -1017,7 +1206,12 @@ impl Guard {
             reason: reason.clone(),
         }
         .emit();
-        GuardResult { status: "blocked".into(), code: b.code().into(), reason, request_id: None }
+        GuardResult {
+            status: "blocked".into(),
+            code: b.code().into(),
+            reason,
+            request_id: None,
+        }
     }
 
     fn agent_transfer(
