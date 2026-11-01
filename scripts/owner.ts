@@ -6,6 +6,7 @@
  *   npm run owner -- pause | unpause
  *   npm run owner -- report <account_id> <reason...>
  */
+import "../src/demo/env";
 import { explorerTx, OwnerGuard } from "../src/near/guard-client";
 import { loadState } from "../src/demo/setup";
 

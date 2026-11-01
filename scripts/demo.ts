@@ -7,6 +7,7 @@
  *   --approve-warn  auto-approve WARN verdicts (default: ask on a TTY, otherwise decline)
  *   --no-intents    skip the NEAR Intents dry-run bonus step
  */
+import "../src/demo/env";
 import { createInterface } from "node:readline/promises";
 import { approveAll, denyAll, type HumanApprover } from "../src/agent/guarded-wallet";
 import { runDemo } from "../src/demo/run";

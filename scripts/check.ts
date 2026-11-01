@@ -8,6 +8,7 @@
  *   npm run check -- evm <0xaddress>          (needs GUARD_EVM_VERDICT_URL)
  * Add --json for machine-readable output.
  */
+import "../src/demo/env";
 import { printAssessment } from "../src/demo/print";
 import { checkEvmToken, LiveNearData, RiskEngine, ScamList, type AgentAction, type Network } from "../src/risk";
 

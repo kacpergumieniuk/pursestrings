@@ -6,7 +6,7 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=20.12"
   },
   "scripts": {
     "build:contracts": "cd contracts/guard && cargo near build non-reproducible-wasm && cd ../test-token && cargo near build non-reproducible-wasm",

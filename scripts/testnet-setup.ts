@@ -7,6 +7,7 @@
  *   npm run testnet:setup -- --force # creates a fresh one
  *   npm run testnet:setup -- --redeploy # upgrades the Guard code on the existing vault (state is kept)
  */
+import "../src/demo/env";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { Account, JsonRpcProvider } from "near-api-js";
