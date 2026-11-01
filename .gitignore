@@ -1,0 +1,17 @@
+# secrets and local state: never commit
+.env
+.env.*
+!.env.example
+.near-credentials/
+.guard-local/
+*.key
+*.pem
+
+# build output
+node_modules/
+dist/
+contracts/target/
+target/
+coverage/
+*.log
+.DS_Store
