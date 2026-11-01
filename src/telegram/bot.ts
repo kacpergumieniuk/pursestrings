@@ -349,9 +349,12 @@ export function formatStatus(s: VaultStatus): string {
   for (const a of s.agents) {
     lines.push(`Agent "${a.name}"${a.enabled ? "" : " (disabled)"}: executed ${a.executed}, blocked ${a.blocked}, pending ${a.pending}`);
     for (const l of a.limits) {
-      lines.push(
-        `  ${l.asset === "near" ? "NEAR" : l.asset}: spent ${describeAmount(l.asset, l.spent_today)} of ${describeAmount(l.asset, l.per_day)} (24h), per tx ${describeAmount(l.asset, l.per_tx)}`,
-      );
+      if (l.asset === "near") {
+        lines.push(`  NEAR: spent ${describeAmount("near", l.spent_today)} of ${describeAmount("near", l.per_day)} (24h), per tx ${describeAmount("near", l.per_tx)}`);
+      } else {
+        const name = l.asset.length > 24 ? `${l.asset.slice(0, 8)}…${l.asset.slice(-6)}` : l.asset;
+        lines.push(`  ${name}: spent ${l.spent_today} of ${l.per_day} units (24h), per tx ${l.per_tx}`);
+      }
     }
   }
   return lines.join("\n");

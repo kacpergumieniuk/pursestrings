@@ -43,12 +43,23 @@ export class ConsoleChat implements ChatApi {
     return this.opts.chatNames?.[chatId] ?? `chat ${chatId}`;
   }
 
-  private render(m: ConsoleMessage, label: string) {
+  private render(m: ConsoleMessage, label: string, previous?: string) {
     const inner = this.width - 4;
     const head = `${this.opts.botName ?? "Guard bot"} → ${this.chatName(m.chatId)}`;
     const lines: string[] = [];
     lines.push(`  ${tgBlue("╭─")} ${tgBlue(head)} ${dim(label)}`);
-    for (const raw of m.text.split("\n")) {
+    let body = m.text.split("\n");
+    if (previous !== undefined) {
+      // Edits: show only what changed after the unchanged leading lines.
+      const old = previous.split("\n");
+      let same = 0;
+      while (same < body.length && same < old.length && body[same] === old[same]) same++;
+      if (same > 1) {
+        lines.push(`  ${tgBlue("│")} ${dim(`… ${same} unchanged line(s)`)}`);
+        body = body.slice(same).filter((l, i) => i > 0 || l !== "");
+      }
+    }
+    for (const raw of body) {
       for (const l of wrap(raw, inner)) lines.push(`  ${tgBlue("│")} ${l}`);
     }
     if (m.buttons.length) {
@@ -76,8 +87,9 @@ export class ConsoleChat implements ChatApi {
 
   async edit(chatId: number, messageId: number, msg: OutgoingMessage): Promise<void> {
     const m: ConsoleMessage = { chatId, messageId, text: msg.text, buttons: msg.buttons ?? [] };
+    const previous = this.messages.get(messageId)?.text;
     this.messages.set(messageId, m);
-    this.render(m, `msg ${messageId} (edited)`);
+    this.render(m, `msg ${messageId} (edited)`, previous);
   }
 
   async answerCallback(callbackId: string, text?: string): Promise<void> {

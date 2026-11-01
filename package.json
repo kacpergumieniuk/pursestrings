@@ -17,7 +17,9 @@
     "testnet:setup": "tsx scripts/testnet-setup.ts",
     "demo": "tsx scripts/demo.ts",
     "demo:sandbox": "tsx scripts/demo.ts --sandbox",
-    "owner": "tsx scripts/owner.ts"
+    "owner": "tsx scripts/owner.ts",
+    "bot": "tsx scripts/bot.ts",
+    "bot:console": "tsx scripts/bot.ts --console"
   },
   "dependencies": {
     "@defuse-protocol/one-click-sdk-typescript": "^0.1.26",
