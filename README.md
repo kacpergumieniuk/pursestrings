@@ -2,9 +2,11 @@
 
 Guard lets you give an AI agent a NEAR budget without giving it your keys.
 The agent signs with a **function-call access key** that can only call the Guard contract. The contract enforces
-**per-transaction and per-day caps**, **recipient and token allow/deny lists**, a **pause switch**, and **human approval**
+**per-transaction and rolling 24-hour caps**, **recipient and token allow/deny lists**, a **pause switch**, and **human approval**
 for anything over the caps. Before the agent signs anything, an off-chain **risk layer** checks the receiver, the token, any link in the message
 that triggered the action, and NEAR Intents swap quotes (dry runs). It returns **ALLOW / WARN / BLOCK** with reasons.
+A **Telegram bot** puts the owner in the loop (approve or reject over-cap requests with one tap, get told about every blocked
+attempt) and lets any community group check an account, token or link with `/check`.
 
 NEAR HACKATHON 2026 entry, track `security` (AI Security & Defense). Testnet only; no mainnet funds are used.
 
@@ -34,9 +36,11 @@ NEAR account and no API key.
 ```bash
 npm ci
 npm run build:contracts        # builds contracts/target/near/{near_guard,test_token}/*.wasm
-npm test                       # 49 TypeScript tests (risk layer, agent wrapper)
-npm run test:contracts         # 31 Rust unit tests + 2 end-to-end tests on a local NEAR sandbox node
+npm test                       # 83 TypeScript tests (risk layer, agent wrapper, Telegram bot)
+npm run test:contracts         # 41 Rust unit tests + 3 end-to-end tests on a local NEAR sandbox node
 npm run demo:sandbox           # full demo on a local NEAR node (downloads the sandbox binary on first run)
+npm run demo:video             # the whole story, paced for a screen recording (sandbox + Telegram bot in console mode)
+npm run bot:console -- --offline  # the Telegram bot in your terminal, no token and no network
 ```
 
 Run `npm run demo:sandbox` and you get:
@@ -64,6 +68,17 @@ npm run owner -- status        # policy, agent budget, pending requests, denylis
 npm run owner -- approve <id>  # owner executes an escalated request
 ```
 
+### Telegram bot
+
+```bash
+npm run bot:console            # the bot in your terminal; uses the testnet vault from .guard-local if present
+npm run bot:console -- --offline  # no network: recorded mainnet facts and a simulated vault
+TELEGRAM_BOT_TOKEN=... TELEGRAM_OWNER_IDS=<your user id> npm run bot   # the real Telegram bot (token from @BotFather)
+```
+
+In console mode you type as the owner (`/check wrap-near.near`, `/pending`, `/status`, `/pause`); `:group <text>` speaks in a
+simulated group chat, and `:tap <n>` presses an inline button, e.g. Approve. See [Telegram front end](#telegram-front-end-srctelegram).
+
 ### Read-only risk checks (no keys)
 
 ```bash
@@ -88,6 +103,7 @@ npm run check -- token <id> --network testnet --json
 | Approval request filed | [Ea3h39u…](https://testnet.nearblocks.io/txns/Ea3h39uZryyL7waKPP3P3ruFtRGsgjC9xLkxpehuTC4j) |
 | Owner approved an earlier request | [CxhALya…](https://testnet.nearblocks.io/txns/CxhALyakvxTdejdU2fm4mc8Hk2dtRX2kGUSeeMnWJkFE) |
 | Compromised agent → drainer, blocked on chain (`RECIPIENT_DENYLISTED`) | [CV5dxxU…](https://testnet.nearblocks.io/txns/CV5dxxUPNHLg8g8kTCSMiA74wfHeXEyks21SRQR48K5E) |
+| Upgrade to the rolling 24h window: deploy + `migrate_spend_windows` in one transaction (1 agent migrated, spend kept) | [3bpkqM4…](https://testnet.nearblocks.io/txns/3bpkqM437p2kSvjFwvfESwLmP1HMc3wCfWocQxofVN1G) |
 
 Full logs: [`docs/demo-output-testnet.txt`](docs/demo-output-testnet.txt) and
 [`docs/demo-output-testnet-bypass.txt`](docs/demo-output-testnet-bypass.txt).
@@ -153,7 +169,14 @@ with separate budgets. `remove_agent` deletes the key.
 **Agent methods.** These can only be signed by a key of the vault: `agent_transfer_near`, `agent_transfer_ft`, `agent_request_approval`.
 A blocked action does **not** panic. It emits a NEP-297 `transfer_blocked` event, increments the agent's `blocked` counter,
 and returns `{status, code, reason}`. The attempt stays visible on chain. Executed transfers settle in a callback; if a
-transfer fails (the receiver is not registered with the token, or the account does not exist), the day's budget is refunded.
+transfer fails (the receiver is not registered with the token, or the account does not exist), the spend is refunded.
+
+**Rolling 24-hour cap.** `per_day` caps the total spent in **any** 24-hour interval, not per calendar day. Spends are
+kept in hourly buckets (at most 25 per asset, pruned on every write); a spend counts for between 24 and 25 hours, so the window
+errs on the strict side. There is no midnight reset to exploit. Vaults deployed with the earlier UTC-day code are upgraded by
+deploying the new code and calling `migrate_spend_windows` in the **same transaction** (`npm run testnet:setup -- --redeploy`
+does this; the call is idempotent). The sandbox test `upgrade_from_utc_day_layout_keeps_spend` deploys the old wasm, spends, and
+upgrades.
 
 **Policy order.** Hard violations are checked before soft ones, so a soft one can never hide a hard one:
 
@@ -171,7 +194,7 @@ those. `drainerx.near` is not affected.
 This is a shared blocklist: other agents or a risk service can add entries, each with evidence. NEAR transfers can never dip into storage
 staking or the configurable reserve.
 
-**Views:** `preflight` (dry-runs the policy for a key), `get_policy`, `get_agent` (spent today, remaining), `list_agents`,
+**Views:** `preflight` (dry-runs the policy for a key), `get_policy`, `get_agent` (spent and remaining in the rolling 24h window, as `spent_today` / `remaining_today`, and `next_release_at`), `list_agents`,
 `list_allowed`, `list_denied`, `get_deny_entry`, `list_pending`.
 
 ### Limits of the agent's function-call key
@@ -188,8 +211,8 @@ What it **can** do, and the limits to be aware of:
   receiver within its caps succeeds. That is why the risk layer exists and why caps should be small.
 - Burn gas, up to its allowance (1 NEAR by default), including on blocked attempts. When the allowance runs out, the key stops
   working (NEAR does not let you top up an existing key's allowance). The owner then registers a new key.
-- Daily caps reset at **00:00 UTC** (fixed windows), so an agent could spend up to 2× the daily cap within a few minutes
-  around midnight. Use the per-transaction cap to bound that.
+- The daily cap is a rolling 24h window (see above), so there is no midnight double-spend. Budget frees up 24–25 hours
+  after each spend, in hourly steps.
 - In the testnet demo the vault also keeps the **full-access key** it was created with, so contracts can be redeployed. In
   production, delete it after deployment (lock the account) so that only the contract can move funds; the owner keeps control
   through the owner methods.
@@ -233,32 +256,71 @@ mock HTTP server.
 the message says, like a successfully injected LLM. `OpenAICompatibleBrain` plugs in any OpenAI-compatible endpoint, e.g.
 NEAR AI Cloud (`LLM_BASE_URL=https://cloud-api.near.ai/v1`, `LLM_API_KEY`, `LLM_MODEL`). Both feed the same `GuardedWallet`.
 
+## Telegram front end (`src/telegram`)
+
+The bot is built around a small `ChatApi` interface (send, edit, answer a button). Telegram (grammY), the terminal console and
+the tests each implement it, so the same `GuardBot` handlers run with or without a token.
+
+| Who | Where | What |
+|---|---|---|
+| Anyone | private chat or group | `/check <account \| token \| link \| text>`: **ALLOW / WARN / BLOCK** with reasons, from the same risk layer the agent uses. The network comes from the name (`.near` / `.testnet`); an account that answers `ft_metadata` is checked as a token too. In a private chat, pasting a value is enough. |
+| Owner | private chat | Each pending approval request, with **Approve / Reject** buttons and a risk check of the receiver. Approve calls `approve_request` signed with the owner key; the message is then edited with the result and the tx link. |
+| Owner | private chat | A notice for every blocked attempt, with the reasons: from the risk layer (nothing was signed) or from the contract (with the tx). |
+| Owner | private chat | `/pending`, `/status` (budgets in the 24h window, counters), `/pause` and `/unpause` (with a confirmation button). |
+
+Security rules, all tested: owner commands and buttons only work for user ids in `TELEGRAM_OWNER_IDS` **and** only in a private
+chat; a request is approved at most once, even on a double tap; a failed transaction keeps the buttons so the owner can retry;
+messages are plain text (no parse mode), so user input cannot inject markup; the agent's justification is labelled untrusted text;
+the signer refuses mainnet networks and mainnet RPC URLs.
+
+How the owner hears about events, even if the agent process is compromised and quiet: `VaultWatcher` polls the contract's
+`list_pending` view, plus the vault's recent transactions through the FastNEAR transactions API and their `transfer_blocked`
+events from NEAR RPC `tx`. Risk-layer refusals never reach the chain, so the agent host reports those itself (`reportOutcome`).
+
+## Demo video kit (`docs/video`)
+
+`npm run demo:video` plays the whole story on a local sandbox at a pace you can narrate: the agent's key is refused a plain
+transfer by the protocol; a normal payment; a prompt-injected scam stopped before signing; an over-cap invoice blocked on chain
+and approved from the owner's (console) Telegram chat with a real `approve_request`; a compromised agent stopped by the
+contract; `/check` in a group chat; and NEAR Intents quotes. Mainnet facts and the 1Click quote are recordings, so every run
+tells the same story. `npm run demo:record` records it into [`docs/video/`](docs/video): an asciicast (`guard-demo.cast`), a
+plain transcript, and `viewer.html`, a self-contained player with the terminal on the left and the Telegram chat on a phone on
+the right. Screenshots of each scene are in [`docs/video/shots/`](docs/video/shots).
+
 ## Tests
 
 | Suite | Command | What it covers |
 |---|---|---|
-| Contract unit tests (31) | `cd contracts && cargo test --lib` | caps, UTC-day reset, lists and modes, sub-account denylist, hard-before-soft order, pause, disable, reporters, approvals (bounded, rejectable, re-checked), callback refund, reserve, multiple agents, readable reasons |
-| Sandbox end-to-end (2) | `cd contracts && cargo test --test sandbox` | a real node; the agent signs with the contract-added function-call key: executed / blocked NEAR and NEP-141 transfers, failed-transfer refunds, denylist with evidence, approval, daily cap, pause; and the key cannot transfer directly, call owner methods or other contracts, attach deposits, or sign after revocation |
-| TypeScript (49) | `npm test` | every risk check (look-alikes, URLs, tokens, counterparties, context, scam lists), 1Click signature/echo/loss/slippage/fees with a recorded real quote, EVM API over real HTTP (mock server), engine, brains |
+| Contract unit tests (41) | `cd contracts && cargo test --lib` | caps, rolling 24h window (no midnight reset, partial expiry, bounded buckets), migration from the UTC-day layout, lists and modes, sub-account denylist, hard-before-soft order, pause, disable, reporters, approvals (bounded, rejectable, re-checked), callback refund, reserve, multiple agents, readable reasons |
+| Sandbox end-to-end (3) | `cd contracts && cargo test --test sandbox` | a real node: upgrade of a vault running the old code (deploy + migrate in one tx, spend kept); the agent signs with the contract-added function-call key: executed / blocked NEAR and NEP-141 transfers, failed-transfer refunds, denylist with evidence, approval, daily cap, pause; and the key cannot transfer directly, call owner methods or other contracts, attach deposits, or sign after revocation |
+| TypeScript (83) | `npm test` | every risk check (look-alikes, URLs, tokens, counterparties, context, scam lists), 1Click signature/echo/loss/slippage/fees with a recorded real quote, EVM API over real HTTP (mock server), engine, brains; Telegram bot: `/check` parsing and verdicts, approvals (owner-only, private chat only, no double approval, retry after failure), notices, the real grammY wiring against a fake Bot API, the vault watcher with fake HTTP, mainnet refusal |
 
 ## Built during NEAR HACKATHON (Nov 1–14, 2026)
 
 - **Everything in this repository was written during the hackathon window**, starting 2026-11-01. There is no pre-hackathon
   baseline; `git log` shows the full history.
+- **What was built when** (all in the window; see `git log`):
+  - Nov 1: Guard contract, sandbox tests, risk layer, NEAR Intents and EVM checks, agent wrapper, testnet deployment, demo.
+  - Nov 1 (the plan's Nov 7–11 work, done early): Telegram front end (`src/telegram`, console mode, tests), rolling 24h
+    cap with an in-place migration (testnet vault upgraded), the paced video demo and its recording (`docs/video`).
 - **Libraries and tools:** `near-sdk`, `near-contract-standards`, `near-sandbox` and `near-api` (Rust, tests), `cargo-near`, `near-api-js` v7,
-  `@defuse-protocol/one-click-sdk-typescript`, `near-sandbox` (npm), `vitest`, `tsx`. The project scaffold came from `cargo near new`.
+  `@defuse-protocol/one-click-sdk-typescript`, `grammy` (Telegram), `near-sandbox` (npm), `vitest`, `tsx`. The project scaffold came
+  from `cargo near new`.
 - **AI-assisted:** the code was written with Claude Code (Q-005).
 - **Related, separate project:** EVM token verdicts come from our Base token-verdict API, a separate service that is not part of
   this repository. Guard only calls it over HTTP, and the tests mock it.
-- **Data sources:** free public endpoints only (FastNEAR RPC and API, NearBlocks API, 1Click API). No paid APIs.
+- **Data sources:** free public endpoints only (FastNEAR RPC, API and transactions API, NearBlocks API, 1Click API). No paid APIs.
 
 ### Known limitations and next steps
 
 - Risk heuristics are signals, not proof. Thresholds live in `DEFAULT_TOKEN_THRESHOLDS` and `DEFAULT_INTENTS_LIMITS`. False positives can be overridden by
   the owner's trusted lists.
 - The bundled scam list contains only demo fixtures. Production needs curated feeds (`GUARD_SCAM_LIST_URL`) and reporters.
-- Planned: a Telegram front end (paste an account, token or link and get a verdict; `/policy` for admins), a hosted demo,
-  and an optional rolling 24h window for daily caps.
+- The Telegram bot has not been run against the real Telegram API yet (no bot token so far). Its grammY wiring is tested
+  against a fake Bot API, and console mode runs the same handlers against the live testnet vault.
+- Bot owner actions sign with a full-access key kept on the bot's machine (testnet only; mainnet is refused in code). A production
+  version would use a wallet signature per approval instead of a server-held key.
+- Planned: a hosted demo; a `/policy` command to edit caps and lists from Telegram.
 
 ## License
 
