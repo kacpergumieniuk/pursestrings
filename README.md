@@ -355,9 +355,9 @@ tells the same story. `npm run demo:record` records it into [`docs/video/`](docs
 plain transcript, and `viewer.html`, a self-contained player with the terminal on the left and the Telegram chat on a phone on
 the right. Screenshots of each scene are in [`docs/video/shots/`](docs/video/shots).
 
-**The demo video:** [`docs/video/pursestrings-demo.mp4`](docs/video/pursestrings-demo.mp4) (2:18, 1080p, English voice-over and subtitles,
+**The demo video:** [`docs/video/pursestrings-demo.mp4`](docs/video/pursestrings-demo.mp4) (2:07, 1080p, English voice-over and subtitles sized for phones,
 [`pursestrings-demo.en.srt`](docs/video/pursestrings-demo.en.srt)). It is this recording rendered frame by frame, on a local NEAR sandbox node,
-with the Telegram bot in console mode. The voice is synthetic (macOS `say`).
+with the Telegram bot in console mode. The voice is synthetic (Kokoro TTS); `npm run demo:render` re-renders it.
 
 ## Tests
 

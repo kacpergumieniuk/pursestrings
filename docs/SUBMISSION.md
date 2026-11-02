@@ -13,7 +13,7 @@ Steps marked **Owner** are ones the agent must not do (rules: "Never without the
 | 2 | Create the GitHub repo and push this repository. **Done:** private repo `github.com/kacpergumieniuk/pursestrings` (renamed from `near-guard` on 2026-11-01). It may stay private while building. | Owner / agent | ☑ |
 | 3 | Final code freeze. Tag it: `git tag hackathon-submission && git push --tags` (Q-003). There is no `pre-hackathon` tag because all code was written in the window. | Owner / agent | ☐ |
 | 3b | Optional: create a Telegram bot with @BotFather, put `TELEGRAM_BOT_TOKEN` and your numeric user id (`TELEGRAM_OWNER_IDS`, from `/whoami`) in `.env`, run `npm run bot`, and try `/check` and `/pending`. The agent must not create the bot for you. | **Owner** | ☐ |
-| 4 | ~~Record the demo video.~~ **Done by the agent:** [`docs/video/pursestrings-demo.mp4`](video/pursestrings-demo.mp4) (2:18, English voice-over, subtitles; see [Demo video](#demo-video-ready)). Owner: **watch it once** and say OK or what to change. Local demo is allowed (Q-012), but a video is required because judges cannot run your machine. | Agent made it; **Owner** reviews | ☐ |
+| 4 | ~~Record the demo video.~~ **Done by the agent:** [`docs/video/pursestrings-demo.mp4`](video/pursestrings-demo.mp4) (2:07, English voice-over, subtitles; see [Demo video](#demo-video-ready)). Owner: **watch it once** and say OK or what to change. Local demo is allowed (Q-012), but a video is required because judges cannot run your machine. | Agent made it; **Owner** reviews | ☐ |
 | 5 | **Make the repo public** before 2026-11-14T23:59Z. Keep it public through judging (Q-014). | **Owner** | ☐ |
 | 6 | Publish the X demo post from your account (draft below). Must say it was built at NEAR HACKATHON, tag **@NEARProtocol** and **#NEARHackathon**, and attach the video (`docs/video/pursestrings-demo.mp4`, upload it directly to X). | **Owner** | ☐ |
 | 7 | Fill in the fields below, check the printed JSON payload, then send it via https://nearhackathon.com/#apply or the API. | **Owner** confirms; then send | ☐ |
@@ -81,8 +81,8 @@ Do not commit the filled payload; it contains personal data.
 
 ## Demo video (ready)
 
-**File:** [`docs/video/pursestrings-demo.mp4`](video/pursestrings-demo.mp4): 2:18 (138.0 s), 1920x1080, 30 fps, H.264 High + AAC 160 kb/s stereo,
-20.4 MB, about -16 LUFS. Re-rendered on 2026-11-01 after the rename from "Guard": new recording, narration, subtitles and end card. Committed to git as a normal file (under 50 MB, no LFS). Subtitles are burned into the picture, and the same
+**File:** [`docs/video/pursestrings-demo.mp4`](video/pursestrings-demo.mp4): 2:07 (127.5 s), 1920x1080, 30 fps, H.264 High + AAC 160 kb/s stereo,
+10.0 MB, about -16 LUFS. Re-rendered on 2026-11-02 with a more natural voice (Kokoro TTS) and captions sized for phones (54 px on 1080p, at most two lines, on a dark box). Committed to git as a normal file (under 50 MB, no LFS). Subtitles are burned into the picture, and the same
 text is also a soft English track inside the mp4 and a separate file, [`docs/video/pursestrings-demo.en.srt`](video/pursestrings-demo.en.srt).
 
 **What it is:** the committed recording (`pursestrings-demo.cast`) played in `viewer.html?clean=1` (terminal on the left, the Telegram
@@ -92,11 +92,11 @@ accounts without Premium, and the rules say the video goes on the X post. The vo
 that the Telegram chat is the bot in **console mode**, and that the contract is also deployed on **NEAR testnet**. It never claims
 mainnet use or real users. The end card adds that the mainnet lookups and the 1Click quote are recordings from 2026-11-01.
 
-**How it was made:** every frame was rendered by seeking the viewer (`window.__guardViewer.seek`) in headless Chromium through
-Playwright, piped to ffmpeg. The voice is macOS `say -v Samantha` (synthetic, the most natural en_US voice on this Mac), one clip per
-subtitle line. The cast is held or sped up between lines so each line starts when its event appears on screen. Checked: speech
-onsets in the final file are within 10 ms of the subtitle cues; frames at 10 timestamps were inspected (each shows the event being
-narrated); the file decodes with no errors.
+**How it was made:** `npm run demo:render` (`scripts/render-video.ts`) renders every frame by seeking the viewer (`window.__guardViewer.seekVideo`) in headless Chromium through
+Playwright, piped to ffmpeg. The voice is Kokoro TTS (synthetic; local, Apache-2.0, voice `am_michael`), one clip per
+caption, so each caption is on screen exactly while it is spoken. The cast is held or sped up between lines so each line starts when its event appears on screen. Checked: captions are
+timed from the voice clips themselves and a caption is on screen at every caption's start and midpoint; frames were inspected (each shows
+the event being narrated, captions legible and inside the frame); the soft track matches the .srt; the file decodes with no errors.
 
 **Rules check (HACKATHON.md, read 2026-11-01):** no required length, format or host, and nothing says the narration must be a
 human voice. The video is attached to the owner's public X post (step 6). The rules do say "the human records a demo and
@@ -121,7 +121,7 @@ Goal: one complete story, from an agent action to a visible result, with the own
    `cd docs/video && python3 -m http.server 8765` and open `http://127.0.0.1:8765/viewer.html?clean=1` at 1920x1080
    (browser full screen). The page scales to any window; `?layout=terminal` shows the terminal only.
 2. Start a screen recording (QuickTime: File > New Screen Recording, or OBS), press **Space** in the viewer, and narrate with
-   the table below. The run is 2:17 (the narrated video is 2:18); scene captions appear on top, the Telegram chat on the phone on the right.
+   the table below. The run is 2:17 (the narrated video is 2:07); scene captions appear on top, the Telegram chat on the phone on the right.
 3. Optional end card (5 s): the repo URL and "Built at NEAR HACKATHON 2026".
 
 Without a browser: `asciinema play docs/video/pursestrings-demo.cast` replays the terminal (bubbles inline), and

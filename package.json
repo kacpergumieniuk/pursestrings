@@ -21,7 +21,8 @@
     "bot": "tsx scripts/bot.ts",
     "bot:console": "tsx scripts/bot.ts --console",
     "demo:video": "tsx scripts/demo-video.ts",
-    "demo:record": "tsx scripts/record-demo.ts"
+    "demo:record": "tsx scripts/record-demo.ts",
+    "demo:render": "tsx scripts/render-video.ts"
   },
   "dependencies": {
     "@defuse-protocol/one-click-sdk-typescript": "^0.1.26",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@types/node": "^26.6.6",
     "near-sandbox": "^0.3.4",
+    "playwright": "^1.64.1",
     "tsx": "^4.23.15",
     "typescript": "^5.9.3",
     "vitest": "^5.0.5"

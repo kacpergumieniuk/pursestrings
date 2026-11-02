@@ -1,0 +1,338 @@
+{
+  "total": 127.431,
+  "endCardAt": 122.907,
+  "voice": "Kokoro TTS am_michael at 1.0x",
+  "lines": [
+    {
+      "id": "n01",
+      "castT": 0.195,
+      "videoT": 0.195,
+      "dur": 3.925,
+      "text": "One injected message can drain an AI agent's wallet."
+    },
+    {
+      "id": "n02",
+      "castT": 0.195,
+      "videoT": 4.42,
+      "dur": 4.075,
+      "text": "PurseStrings: your agent carries the purse, you hold the strings."
+    },
+    {
+      "id": "n03",
+      "castT": 6.195,
+      "videoT": 8.795,
+      "dur": 4.352,
+      "text": "This runs on a local NEAR node, with the real PurseStrings contract."
+    },
+    {
+      "id": "n04",
+      "castT": 8.802,
+      "videoT": 13.447,
+      "dur": 3.605,
+      "text": "The agent's key can only call three methods on the vault."
+    },
+    {
+      "id": "n05",
+      "castT": 11.803,
+      "videoT": 17.352,
+      "dur": 4.608,
+      "text": "A plain transfer with that key is rejected by the protocol itself."
+    },
+    {
+      "id": "n06",
+      "castT": 18.221,
+      "videoT": 22.26,
+      "dur": 3.819,
+      "text": "A normal request: pay a contractor 0.2 NEAR."
+    },
+    {
+      "id": "n07",
+      "castT": 26.895,
+      "videoT": 26.379,
+      "dur": 4.48,
+      "text": "The risk layer says ALLOW. The contract checks the caps and executes."
+    },
+    {
+      "id": "n08",
+      "castT": 32.902,
+      "videoT": 31.159,
+      "dur": 5.291,
+      "text": "Now a fake \"system notice\" tells the agent to send USDC to a drainer."
+    },
+    {
+      "id": "n09",
+      "castT": 43.52,
+      "videoT": 36.75,
+      "dur": 3.115,
+      "text": "Our agent is gullible on purpose, so it tries."
+    },
+    {
+      "id": "n10",
+      "castT": 45.326,
+      "videoT": 40.164,
+      "dur": 8.704,
+      "text": "PurseStrings refuses before signing: an injection, a scam link, a fake USDC token, a denylisted receiver."
+    },
+    {
+      "id": "n11",
+      "castT": 49.73,
+      "videoT": 49.168,
+      "dur": 2.411,
+      "text": "The owner gets the reasons on Telegram."
+    },
+    {
+      "id": "n12",
+      "castT": 55.733,
+      "videoT": 51.879,
+      "dur": 5.077,
+      "text": "An honest invoice, but over the 0.5 NEAR per-transaction cap."
+    },
+    {
+      "id": "n13",
+      "castT": 67.676,
+      "videoT": 57.256,
+      "dur": 3.947,
+      "text": "The contract blocks it on chain, and the agent asks the owner."
+    },
+    {
+      "id": "n14",
+      "castT": 69.478,
+      "videoT": 61.503,
+      "dur": 6.165,
+      "text": "The request reaches the Telegram bot, here in console mode, with a risk check of the receiver."
+    },
+    {
+      "id": "n15",
+      "castT": 74.487,
+      "videoT": 67.968,
+      "dur": 5.845,
+      "text": "One tap on Approve, and the bot signs approve_request with the owner's key. Executed."
+    },
+    {
+      "id": "n16",
+      "castT": 82.594,
+      "videoT": 74.114,
+      "dur": 3.904,
+      "text": "Now assume the agent is fully compromised and skips our checks."
+    },
+    {
+      "id": "n17",
+      "castT": 98.006,
+      "videoT": 80.278,
+      "dur": 6.805,
+      "text": "The contract still refuses: the receiver is denylisted, a hard block no approval can override."
+    },
+    {
+      "id": "n18",
+      "castT": 99.806,
+      "videoT": 87.384,
+      "dur": 1.408,
+      "text": "The owner is told."
+    },
+    {
+      "id": "n19",
+      "castT": 105.807,
+      "videoT": 89.784,
+      "dur": 5.013,
+      "text": "The same bot works in any group chat: paste an account, a token or a link."
+    },
+    {
+      "id": "n20",
+      "castT": 108.409,
+      "videoT": 95.098,
+      "dur": 2.624,
+      "text": "A look-alike of wrap.near: BLOCK."
+    },
+    {
+      "id": "n21",
+      "castT": 113.414,
+      "videoT": 98.022,
+      "dur": 3.029,
+      "text": "A phishing link with near.org in it: BLOCK."
+    },
+    {
+      "id": "n22",
+      "castT": 118.42,
+      "videoT": 101.351,
+      "dur": 2.283,
+      "text": "The real wrap.near: ALLOW."
+    },
+    {
+      "id": "n23",
+      "castT": 125.417,
+      "videoT": 104.15,
+      "dur": 3.883,
+      "text": "Swaps are checked with NEAR Intents quotes, as dry runs."
+    },
+    {
+      "id": "n24",
+      "castT": 128.046,
+      "videoT": 108.332,
+      "dur": 5.077,
+      "text": "A normal quote passes. The same swap with 40% slippage is blocked."
+    },
+    {
+      "id": "n25",
+      "castT": 134.458,
+      "videoT": 113.71,
+      "dur": 3.051,
+      "text": "Daily caps are a rolling 24-hour window."
+    },
+    {
+      "id": "n26",
+      "castT": 136.863,
+      "videoT": 117.06,
+      "dur": 5.547,
+      "text": "The contract is also deployed on NEAR testnet, and the code is MIT-licensed."
+    },
+    {
+      "id": "n27",
+      "castT": 136.863,
+      "videoT": 122.907,
+      "dur": 2.624,
+      "text": "What should an agent wallet always refuse?"
+    }
+  ],
+  "captions": [
+    {
+      "start": 0.195,
+      "end": 4.37,
+      "text": "One injected message can drain an AI agent's wallet."
+    },
+    {
+      "start": 4.42,
+      "end": 8.745,
+      "text": "PurseStrings: your agent carries the purse, you hold the strings."
+    },
+    {
+      "start": 8.795,
+      "end": 13.397,
+      "text": "This runs on a local NEAR node, with the real PurseStrings contract."
+    },
+    {
+      "start": 13.447,
+      "end": 17.302,
+      "text": "The agent's key can only call three methods on the vault."
+    },
+    {
+      "start": 17.352,
+      "end": 22.21,
+      "text": "A plain transfer with that key is rejected by the protocol itself."
+    },
+    {
+      "start": 22.26,
+      "end": 26.329,
+      "text": "A normal request: pay a contractor 0.2 NEAR."
+    },
+    {
+      "start": 26.379,
+      "end": 31.109,
+      "text": "The risk layer says ALLOW. The contract checks the caps and executes."
+    },
+    {
+      "start": 31.159,
+      "end": 36.7,
+      "text": "Now a fake \"system notice\" tells the agent to send USDC to a drainer."
+    },
+    {
+      "start": 36.75,
+      "end": 40.114,
+      "text": "Our agent is gullible on purpose, so it tries."
+    },
+    {
+      "start": 40.164,
+      "end": 44.349,
+      "text": "PurseStrings refuses before signing: an injection,"
+    },
+    {
+      "start": 44.349,
+      "end": 49.118,
+      "text": "a scam link, a fake USDC token, a denylisted receiver."
+    },
+    {
+      "start": 49.168,
+      "end": 51.829,
+      "text": "The owner gets the reasons on Telegram."
+    },
+    {
+      "start": 51.879,
+      "end": 57.206,
+      "text": "An honest invoice, but over the 0.5 NEAR per-transaction cap."
+    },
+    {
+      "start": 57.256,
+      "end": 61.453,
+      "text": "The contract blocks it on chain, and the agent asks the owner."
+    },
+    {
+      "start": 61.503,
+      "end": 67.918,
+      "text": "The request reaches the Telegram bot, here in console mode, with a risk check of the receiver."
+    },
+    {
+      "start": 67.968,
+      "end": 74.064,
+      "text": "One tap on Approve, and the bot signs approve_request with the owner's key. Executed."
+    },
+    {
+      "start": 74.114,
+      "end": 78.268,
+      "text": "Now assume the agent is fully compromised and skips our checks."
+    },
+    {
+      "start": 80.278,
+      "end": 87.334,
+      "text": "The contract still refuses: the receiver is denylisted, a hard block no approval can override."
+    },
+    {
+      "start": 87.384,
+      "end": 89.042,
+      "text": "The owner is told."
+    },
+    {
+      "start": 89.784,
+      "end": 95.048,
+      "text": "The same bot works in any group chat: paste an account, a token or a link."
+    },
+    {
+      "start": 95.098,
+      "end": 97.972,
+      "text": "A look-alike of wrap.near: BLOCK."
+    },
+    {
+      "start": 98.022,
+      "end": 101.301,
+      "text": "A phishing link with near.org in it: BLOCK."
+    },
+    {
+      "start": 101.351,
+      "end": 103.884,
+      "text": "The real wrap.near: ALLOW."
+    },
+    {
+      "start": 104.15,
+      "end": 108.282,
+      "text": "Swaps are checked with NEAR Intents quotes, as dry runs."
+    },
+    {
+      "start": 108.332,
+      "end": 113.66,
+      "text": "A normal quote passes. The same swap with 40% slippage is blocked."
+    },
+    {
+      "start": 113.71,
+      "end": 117.01,
+      "text": "Daily caps are a rolling 24-hour window."
+    },
+    {
+      "start": 117.06,
+      "end": 122.857,
+      "text": "The contract is also deployed on NEAR testnet, and the code is MIT-licensed."
+    },
+    {
+      "start": 122.907,
+      "end": 125.781,
+      "text": "What should an agent wallet always refuse?"
+    }
+  ]
+}

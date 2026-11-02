@@ -1,108 +1,111 @@
 1
-00:00:00,357 --> 00:00:03,204
+00:00:00,195 --> 00:00:04,370
 One injected message can drain an AI agent's wallet.
 
 2
-00:00:03,504 --> 00:00:07,397
+00:00:04,420 --> 00:00:08,745
 PurseStrings: your agent carries the purse, you hold the strings.
 
 3
-00:00:07,957 --> 00:00:11,735
+00:00:08,795 --> 00:00:13,397
 This runs on a local NEAR node, with the real PurseStrings contract.
 
 4
-00:00:12,035 --> 00:00:14,916
+00:00:13,447 --> 00:00:17,302
 The agent's key can only call three methods on the vault.
 
 5
-00:00:15,216 --> 00:00:18,893
+00:00:17,352 --> 00:00:22,210
 A plain transfer with that key is rejected by the protocol itself.
 
 6
-00:00:20,190 --> 00:00:23,683
+00:00:22,260 --> 00:00:26,329
 A normal request: pay a contractor 0.2 NEAR.
 
 7
-00:00:26,374 --> 00:00:31,243
+00:00:26,379 --> 00:00:31,109
 The risk layer says ALLOW. The contract checks the caps and executes.
 
 8
-00:00:32,596 --> 00:00:36,729
+00:00:31,159 --> 00:00:36,700
 Now a fake "system notice" tells the agent to send USDC to a drainer.
 
 9
-00:00:38,707 --> 00:00:41,671
+00:00:36,750 --> 00:00:40,114
 Our agent is gullible on purpose, so it tries.
 
 10
-00:00:41,971 --> 00:00:49,506
-PurseStrings refuses before signing: an injection, a scam link, a fake USDC token, a denylisted receiver.
+00:00:40,164 --> 00:00:44,349
+PurseStrings refuses before signing: an injection,
 
 11
-00:00:49,806 --> 00:00:51,986
-The owner gets the reasons on Telegram.
+00:00:44,349 --> 00:00:49,118
+a scam link, a fake USDC token, a denylisted receiver.
 
 12
-00:00:56,111 --> 00:01:00,358
-An honest invoice, but over the 0.5 NEAR per-transaction cap.
+00:00:49,168 --> 00:00:51,829
+The owner gets the reasons on Telegram.
 
 13
-00:01:03,672 --> 00:01:07,146
-The contract blocks it on chain, and the agent asks the owner.
+00:00:51,879 --> 00:00:57,206
+An honest invoice, but over the 0.5 NEAR per-transaction cap.
 
 14
-00:01:07,446 --> 00:01:12,812
-The request reaches the Telegram bot, here in console mode, with a risk check of the receiver.
+00:00:57,256 --> 00:01:01,453
+The contract blocks it on chain, and the agent asks the owner.
 
 15
-00:01:13,112 --> 00:01:18,997
-One tap on Approve, and the bot signs approve_request with the owner's key. Executed.
+00:01:01,503 --> 00:01:07,918
+The request reaches the Telegram bot, here in console mode, with a risk check of the receiver.
 
 16
-00:01:20,880 --> 00:01:24,663
-Now assume the agent is fully compromised and skips our checks.
+00:01:07,968 --> 00:01:14,064
+One tap on Approve, and the bot signs approve_request with the owner's key. Executed.
 
 17
-00:01:28,033 --> 00:01:34,193
-The contract still refuses: the receiver is denylisted, a hard block no approval can override.
+00:01:14,114 --> 00:01:18,268
+Now assume the agent is fully compromised and skips our checks.
 
 18
-00:01:34,493 --> 00:01:35,506
-The owner is told.
+00:01:20,278 --> 00:01:27,334
+The contract still refuses: the receiver is denylisted, a hard block no approval can override.
 
 19
-00:01:38,101 --> 00:01:42,859
-The same bot works in any group chat: paste an account, a token or a link.
+00:01:27,384 --> 00:01:29,042
+The owner is told.
 
 20
-00:01:43,159 --> 00:01:45,332
-A look-alike of wrap.near: BLOCK.
+00:01:29,784 --> 00:01:35,048
+The same bot works in any group chat: paste an account, a token or a link.
 
 21
-00:01:47,220 --> 00:01:49,814
-A phishing link with near.org in it: BLOCK.
+00:01:35,098 --> 00:01:37,972
+A look-alike of wrap.near: BLOCK.
 
 22
-00:01:51,508 --> 00:01:53,386
-The real wrap.near: ALLOW.
+00:01:38,022 --> 00:01:41,301
+A phishing link with near.org in it: BLOCK.
 
 23
-00:01:54,960 --> 00:01:58,279
-Swaps are checked with NEAR Intents quotes, as dry runs.
+00:01:41,351 --> 00:01:43,884
+The real wrap.near: ALLOW.
 
 24
-00:01:58,579 --> 00:02:02,973
-A normal quote passes. The same swap with 40% slippage is blocked.
+00:01:44,150 --> 00:01:48,282
+Swaps are checked with NEAR Intents quotes, as dry runs.
 
 25
-00:02:03,273 --> 00:02:06,080
-Daily caps are a rolling 24-hour window.
+00:01:48,332 --> 00:01:53,660
+A normal quote passes. The same swap with 40% slippage is blocked.
 
 26
-00:02:06,380 --> 00:02:11,050
-The contract is also deployed on NEAR testnet, and the code is MIT-licensed.
+00:01:53,710 --> 00:01:57,010
+Daily caps are a rolling 24-hour window.
 
 27
-00:02:11,350 --> 00:02:13,648
-What should an agent wallet always refuse?
+00:01:57,060 --> 00:02:02,857
+The contract is also deployed on NEAR testnet, and the code is MIT-licensed.
 
+28
+00:02:02,907 --> 00:02:05,781
+What should an agent wallet always refuse?

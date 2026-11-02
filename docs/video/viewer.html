@@ -48,6 +48,20 @@
   #controls button { background: #222b36; color: #ddd; border: 1px solid #333; border-radius: 6px; padding: 5px 10px; cursor: pointer; }
   body.clean #controls { display: none; }
   body.terminal #phone { display: none; }
+  /* Rendered video (the renderer calls __guardViewer.setTimeline): a caption band at the bottom and an end card. */
+  body.video main { height: calc(1080px - 150px - 176px); padding-bottom: 12px; }
+  /* Every video frame is a fresh seek, so CSS animations would restart on each frame and leave bubbles half-faded. */
+  body.video *, body.video *::before, body.video *::after { animation: none !important; transition: none !important; }
+  #subs { display: none; position: absolute; left: 0; right: 0; bottom: 0; height: 176px; align-items: center; justify-content: center; padding: 0 60px; z-index: 5; }
+  body.video #subs { display: flex; }
+  #subs span { background: rgba(0,0,0,.82); color: #fff; font-size: 54px; font-weight: 650; line-height: 1.2; padding: 10px 30px 12px; border-radius: 14px; text-align: center; max-width: 1800px; text-wrap: balance; }
+  #subs span:empty { display: none; }
+  #end { position: absolute; inset: 0; background: var(--bg); display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding-bottom: 150px; z-index: 4; }
+  #end h1 { margin: 0; font-size: 112px; font-weight: 800; color: #fff; letter-spacing: -1px; }
+  #end .tag { font-size: 36px; color: var(--dim); margin-top: 18px; } #end .line { font-size: 30px; color: #cfd6df; margin-top: 18px; }
+  #end .built { font-size: 34px; font-weight: 750; color: var(--accent); margin-top: 44px; }
+  #end .u { font: 600 36px "SF Mono", Menlo, monospace; color: #fff; margin-top: 18px; }
+  #end .fine { font-size: 20px; color: var(--dim); margin-top: 40px; line-height: 1.6; max-width: 1300px; }
   @keyframes pop { from { transform: translateY(8px); opacity: 0; } to { transform: none; opacity: 1; } }
   @keyframes flash { 0% { box-shadow: 0 0 0 3px rgba(42,171,238,.9); } 100% { box-shadow: 0 0 0 0 rgba(42,171,238,0); } }
 </style>
@@ -66,6 +80,10 @@
       <div id="toast"></div>
     </div>
   </main>
+  <div id="end"><h1>PurseStrings</h1><div class="tag">a policy firewall for AI-agent wallets on NEAR</div><div class="line">Your agent carries the purse. You hold the strings.</div>
+    <div class="built">Built at NEAR HACKATHON 2026 · security track</div><div class="u">github.com/kacpergumieniuk/pursestrings · MIT</div>
+    <div class="fine">Demo recorded on a local NEAR sandbox node with the real PurseStrings contract; the contract is also deployed on NEAR testnet.<br>The Telegram chat is the bot's console mode. Mainnet lookups and the 1Click quote are recordings from 2026-11-01. Synthetic voice (Kokoro TTS).</div></div>
+  <div id="subs"><span></span></div>
 </div>
 <div id="controls"><button id="play">▶ play (space)</button><button id="restart">⟲ restart</button><span id="time">0.0 s</span><span>· speed</span><select id="speed"><option>0.75</option><option selected>1</option><option>1.25</option><option>1.5</option><option>2</option></select><span>· ?scene=N · ?clean=1 · ?layout=terminal</span></div>
 <script>
@@ -214,7 +232,36 @@ reset();
 if (params.get("scene")) seek(sceneEnd(Number(params.get("scene"))));
 else if (params.get("t")) seek(Number(params.get("t")));
 else { seek(0); if (params.get("autoplay")) setTimeout(play, 800); }
-window.__guardViewer = { seek, sceneEnd, END };
+// ---- rendered video: video time -> cast time map, captions and the end card (set by scripts/render-video.ts)
+let vmap = null, vsubs = [], endCardAt = Infinity, lastSub = null;
+function castTimeAt(v) {
+  if (!vmap) return v;
+  if (v <= vmap[0][0]) return vmap[0][1];
+  for (let i = 1; i < vmap.length; i++) {
+    const [v0, c0, s0] = vmap[i - 1], [v1, c1] = vmap[i];
+    if (v < v1) return Math.min(c1, c0 + (v - v0) * (s0 || 1));
+  }
+  return vmap[vmap.length - 1][1];
+}
+// Captions keep to two lines: if a long one wraps to three, the font steps down until it fits.
+function setSub(text) {
+  if (text === lastSub) return;
+  lastSub = text;
+  const el = document.querySelector("#subs span");
+  el.textContent = text;
+  for (let px = 54; px >= 36; px -= 2) {
+    el.style.fontSize = px + "px";
+    if (!text || el.offsetHeight <= 2 * px * 1.2 + 24) break;
+  }
+}
+function setTimeline(m, s, endAt) { vmap = m; vsubs = s || []; endCardAt = endAt ?? Infinity; document.body.classList.add("video"); }
+function seekVideo(v) {
+  seek(castTimeAt(v));
+  const sub = vsubs.find((x) => v >= x.start && v < x.end);
+  setSub(sub ? sub.text : "");
+  document.getElementById("end").style.display = v >= endCardAt ? "flex" : "none";
+}
+window.__guardViewer = { seek, sceneEnd, END, setTimeline, seekVideo };
 </script>
 </body>
 </html>
