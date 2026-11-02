@@ -45,7 +45,7 @@ trap. Values marked **owner decides** must come from you; the agent must not gue
 | `tracks` | ids from the tracks table, each once | **owner decides** (suggestion: `["security", "agents"]`) |
 | `nearAddress` | mainnet payout account, lowercase, 2–64 chars | **owner creates and provides** (step 1) |
 | `projectUrl` | public repo URL, ≤300 chars, unique | after step 5 |
-| `demoUrl` | public X post URL, ≤300 chars | after step 6 |
+| `demoUrl` | public X post URL, ≤300 chars | https://x.com/CanoeReeves11/status/2117323459587940436 (posted 2026-11-02 from the Mintward account) |
 | `idea` | 20–2000 chars | draft below; owner edits |
 | `consent` | `true` only after the owner agrees to the notice below | **owner** |
 
@@ -70,7 +70,7 @@ Check the length before sending: `node -e 'console.log(process.argv[1].length)' 
   "tracks": ["security"],
   "nearAddress": "<owner's mainnet account>",
   "projectUrl": "https://github.com/kacpergumieniuk/pursestrings",
-  "demoUrl": "https://x.com/<owner>/status/<id>",
+  "demoUrl": "https://x.com/CanoeReeves11/status/2117323459587940436",
   "idea": "<final text>",
   "consent": true
 }
