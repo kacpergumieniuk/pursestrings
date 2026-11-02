@@ -12,7 +12,7 @@
  * Secrets are written to .guard-local/<network>.json (gitignored, mode 0600) and never printed.
  */
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { Account, actions, JsonRpcProvider, KeyPair, type KeyPairString, nearToYocto, teraToGas } from "near-api-js";
 import { OwnerGuard } from "../near/guard-client";
@@ -48,6 +48,8 @@ const WASM = {
   guard: join(ROOT, "contracts/target/near/near_guard/near_guard.wasm"),
   token: join(ROOT, "contracts/target/near/test_token/test_token.wasm"),
 };
+/** Committed builds of the same sources (see contracts/prebuilt/README.md), used when Rust is not installed. */
+export const PREBUILT_DIR = join(ROOT, "contracts/prebuilt");
 
 export function statePath(network: Network): string {
   return join(STATE_DIR, `${network}.json`);
@@ -66,8 +68,13 @@ export function saveState(s: DemoState): void {
 }
 
 function readWasm(path: string): Uint8Array {
-  if (!existsSync(path)) throw new Error(`${path} missing: run \`npm run build:contracts\` first`);
-  return new Uint8Array(readFileSync(path));
+  if (existsSync(path)) return new Uint8Array(readFileSync(path));
+  const prebuilt = join(PREBUILT_DIR, basename(path));
+  if (existsSync(prebuilt)) {
+    console.log(`using the committed ${basename(path)} from contracts/prebuilt (run \`npm run build:contracts\` to build your own)`);
+    return new Uint8Array(readFileSync(prebuilt));
+  }
+  throw new Error(`${path} missing: run \`npm run build:contracts\` first`);
 }
 
 async function waitForAccount(provider: JsonRpcProvider, id: string, tries = 30): Promise<void> {

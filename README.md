@@ -34,13 +34,25 @@ PurseStrings limits the damage in two layers. They are independent, so an agent 
 
 ## Try it
 
-Prerequisites: Node ≥ 20.12, Rust with `wasm32-unknown-unknown`, and [`cargo-near`](https://github.com/near/cargo-near). The sandbox demo needs no
+**Fastest path (Node only, about 3 minutes, no Rust, no NEAR account, no API key):**
+
+```bash
+npm ci
+npm test                       # 84 TypeScript tests
+npm run demo:sandbox           # local NEAR node + the committed contract build in contracts/prebuilt/
+```
+
+You see: the normal payment `executed`, the prompt-injected scam `refused_by_risk_layer` (nothing signed), and the
+0.8 NEAR invoice `blocked` on chain with `OVER_TX_CAP` plus an approval request for the owner. The steps are explained
+below. To see the live testnet vault without any keys, see [Live testnet deployment](#live-testnet-deployment).
+
+Full path. Prerequisites: Node ≥ 20.12, Rust with `wasm32-unknown-unknown`, and [`cargo-near`](https://github.com/near/cargo-near). The sandbox demo needs no
 NEAR account and no API key.
 
 ```bash
 npm ci
-npm run build:contracts        # builds contracts/target/near/{near_guard,test_token}/*.wasm
-npm test                       # 83 TypeScript tests (risk layer, agent wrapper, Telegram bot)
+npm run build:contracts        # builds contracts/target/near/{near_guard,test_token}/*.wasm (used instead of contracts/prebuilt/)
+npm test                       # 84 TypeScript tests (risk layer, agent wrapper, Telegram bot, prebuilt checksums)
 npm run test:contracts         # 41 Rust unit tests + 3 end-to-end tests on a local NEAR sandbox node
 npm run demo:sandbox           # full demo on a local NEAR node (downloads the sandbox binary on first run)
 npm run demo:video             # the whole story, paced for a screen recording (sandbox + Telegram bot in console mode)
@@ -111,6 +123,21 @@ npm run check -- token <id> --network testnet --json
 
 Full logs: [`docs/demo-output-testnet.txt`](docs/demo-output-testnet.txt) and
 [`docs/demo-output-testnet-bypass.txt`](docs/demo-output-testnet-bypass.txt).
+
+**Read the live vault without keys.** Request #3 (0.8 NEAR to the vendor, over the cap) is still pending for the owner:
+
+```bash
+VIEW='const [m,a="{}"]=process.argv.slice(1);fetch("https://test.rpc.fastnear.com",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"query",params:{request_type:"call_function",finality:"optimistic",account_id:"vault.guard-owner-mvxpkwqz.testnet",method_name:m,args_base64:Buffer.from(a).toString("base64")}})}).then(r=>r.json()).then(j=>console.log(j.result?.result?Buffer.from(j.result.result).toString():JSON.stringify(j.result??j.error)))'
+node -e "$VIEW" get_policy                            # owner, pause switch, list modes, reserve, 1 agent, 1 pending request
+node -e "$VIEW" list_pending                          # request #3: OVER_TX_CAP, with the agent's justification
+node -e "$VIEW" list_denied '{"kind":"recipient"}'    # the drainer, with the reason and evidence
+```
+
+**Verify the deployed code.** The vault's code hash on testnet is `6xar8YpP4sdK1PoYSUeyExehDTc3Fz8nJHYFbNQUzpfV`
+(`view_account`). It is the sha256 (base58) of `cargo near build non-reproducible-wasm` of `contracts/guard` at commit
+`6b25b55`, rebuilt and compared on 2026-11-02. Later commits changed only the crate's description, its repository URL and
+a doc comment (the rename to PurseStrings), not the contract logic. The build is not reproducible across machines (it
+embeds local dependency paths), so on another machine compare the logic, not the hash.
 
 ## How PurseStrings differs from OutLayer, PolicyLayer and Coinbase Agentic Wallet
 
@@ -338,7 +365,7 @@ with the Telegram bot in console mode. The voice is synthetic (macOS `say`).
 |---|---|---|
 | Contract unit tests (41) | `cd contracts && cargo test --lib` | caps, rolling 24h window (no midnight reset, partial expiry, bounded buckets), migration from the UTC-day layout, lists and modes, sub-account denylist, hard-before-soft order, pause, disable, reporters, approvals (bounded, rejectable, re-checked), callback refund, reserve, multiple agents, readable reasons |
 | Sandbox end-to-end (3) | `cd contracts && cargo test --test sandbox` | a real node: upgrade of a vault running the old code (deploy + migrate in one tx, spend kept); the agent signs with the contract-added function-call key: executed / blocked NEAR and NEP-141 transfers, failed-transfer refunds, denylist with evidence, approval, daily cap, pause; and the key cannot transfer directly, call owner methods or other contracts, attach deposits, or sign after revocation |
-| TypeScript (83) | `npm test` | every risk check (look-alikes, URLs, tokens, counterparties, context, scam lists), 1Click signature/echo/loss/slippage/fees with a recorded real quote, EVM API over real HTTP (mock server), engine, brains; Telegram bot: `/check` parsing and verdicts, approvals (owner-only, private chat only, no double approval, retry after failure), notices, the real grammY wiring against a fake Bot API, the vault watcher with fake HTTP, mainnet refusal |
+| TypeScript (84) | `npm test` | committed contract builds match `SHA256SUMS`; every risk check (look-alikes, URLs, tokens, counterparties, context, scam lists), 1Click signature/echo/loss/slippage/fees with a recorded real quote, EVM API over real HTTP (mock server), engine, brains; Telegram bot: `/check` parsing and verdicts, approvals (owner-only, private chat only, no double approval, retry after failure), notices, the real grammY wiring against a fake Bot API, the vault watcher with fake HTTP, mainnet refusal |
 
 ## Built during NEAR HACKATHON (Nov 1–14, 2026)
 

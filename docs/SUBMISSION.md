@@ -20,6 +20,16 @@ Steps marked **Owner** are ones the agent must not do (rules: "Never without the
 | 8 | If you also submit a second project (max 2 per person, Q-015), **name the other project in both READMEs**. | Owner | ☐ |
 | 9 | Keep the testnet vault and (optional) hosted demo up until at least 2026-11-18, ideally 2026-11-25. Answer judge questions in Discord. | Owner | ☐ |
 
+## Rules check (re-read 2026-11-02)
+
+https://nearhackathon.com/HACKATHON.md and the site FAQ were re-read on 2026-11-02; the full audit is in the HQ repo,
+`research/hackathon-readiness-2026-11.md`. Changes since the kit was written: Q-001 now counts code from the
+2026-10-19 announcement (nothing here predates 2026-11-01, so no change for us). Judging: Claude Code and Codex first
+check that the project runs and does what the README says; human judges then decide, guided by technical
+implementation, design, impact, originality and sustainability. For that first check, `npm ci && npm test && npm run
+demo:sandbox` now runs with Node only (committed contract build in `contracts/prebuilt/`). The X post has to be public
+and published by the human; the rules do not say it must come from a personal account.
+
 ## Submission fields
 
 The API (`POST https://nearhackathon.com/api/applications`) accepts exactly these fields. Do not add others; `website` is a spam
