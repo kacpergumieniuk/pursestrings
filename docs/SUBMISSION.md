@@ -43,7 +43,7 @@ trap. Values marked **owner decides** must come from you; the agent must not gue
 | `email` | valid, ≤160 chars, ≤2 submissions per email | **owner decides** |
 | `size` | one of `1`, `2 - 4`, `4 - 6`, `6 - 8`, `8+` (exactly) | **owner decides** (likely `1`) |
 | `tracks` | ids from the tracks table, each once | **owner decides** (suggestion: `["security", "agents"]`) |
-| `nearAddress` | mainnet payout account, lowercase, 2–64 chars | **owner creates and provides** (step 1) |
+| `nearAddress` | mainnet payout account, lowercase, 2–64 chars | `x4b47-hot.tg` (owner created in HOT wallet, 2026-11-02; exists on mainnet) |
 | `projectUrl` | public repo URL, ≤300 chars, unique | after step 5 |
 | `demoUrl` | public X post URL, ≤300 chars | https://x.com/CanoeReeves11/status/2117323459587940436 (posted 2026-11-02 from the Mintward account) |
 | `idea` | 20–2000 chars | draft below; owner edits |
@@ -68,7 +68,7 @@ Check the length before sending: `node -e 'console.log(process.argv[1].length)' 
   "email": "<owner>",
   "size": "<owner: 1 | 2 - 4 | ...>",
   "tracks": ["security"],
-  "nearAddress": "<owner's mainnet account>",
+  "nearAddress": "x4b47-hot.tg",
   "projectUrl": "https://github.com/kacpergumieniuk/pursestrings",
   "demoUrl": "https://x.com/CanoeReeves11/status/2117323459587940436",
   "idea": "<final text>",
